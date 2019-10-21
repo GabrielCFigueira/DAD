@@ -49,5 +49,15 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Puppet-PCS\Puppet-PCS.csproj">
+      <Project>{6ccb69e1-6660-4c14-9b6c-248628f20fbc}</Project>
+      <Name>Puppet-PCS</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Puppet-Server\Puppet-Server.csproj">
+      <Project>{fc61062f-31f0-4770-868b-e665ffefdfe3}</Project>
+      <Name>Puppet-Server</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

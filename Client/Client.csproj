@@ -4,10 +4,10 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{3AD5A25D-3F75-41CC-A01D-187BFA8EA8C7}</ProjectGuid>
+    <ProjectGuid>{C3D3B382-92CA-43FF-BB0B-74F0D9F2798E}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>Server</RootNamespace>
-    <AssemblyName>Server</AssemblyName>
+    <RootNamespace>Client</RootNamespace>
+    <AssemblyName>Client</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -53,10 +53,6 @@
     <ProjectReference Include="..\Client-Server\Client-Server.csproj">
       <Project>{34ebcbf3-8dda-4d9f-945e-9de1317750d2}</Project>
       <Name>Client-Server</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Puppet-Server\Puppet-Server.csproj">
-      <Project>{fc61062f-31f0-4770-868b-e665ffefdfe3}</Project>
-      <Name>Puppet-Server</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
