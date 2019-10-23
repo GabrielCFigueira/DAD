@@ -24,6 +24,30 @@ namespace Project
                 "tcp://localhost:8888/MeetingServer");
             server.Connect("tcp://localhost:" + 8000 + "/MeetingClient");
 
+            List<String> date_location = new List<string>();
+            date_location.Add("Lisboa,2019-11-14");
+            date_location.Add("Porto,2020-02-03");
+
+            List<String> invitees = new List<string>();
+            invitees.Add("Maria");
+            invitees.Add("Johny");
+            invitees.Add("Tiago");
+
+            MeetingClient.CreateMeeting("Budget_2020", 5, 2, 3, date_location, invitees);
+
+            List<String> date_location2 = new List<string>();
+            date_location2.Add("Setubal,2019-11-14");
+            date_location2.Add("Braga,2020-02-03");
+
+            List<String> invitees2 = new List<string>();
+            invitees2.Add("Tatiana");
+            invitees2.Add("Laura");
+            invitees2.Add("Daniel");
+
+            MeetingClient.CreateMeeting("Pokemon_GO", 5, 2, 3, date_location2, invitees2);
+
+            MeetingClient.ListMeetings();
+
             System.Console.ReadLine();
 
         }
@@ -46,7 +70,7 @@ namespace Project
 
         public void CreateMeeting(String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
         {
-            throw new NotImplementedException();
+            Server.CreateMeeting(this.UserName, topic, min_attendees, n_slots, n_invitees, slots, invitees);
         }
 
         public void JoinMeeting(String topic)
@@ -56,7 +80,7 @@ namespace Project
 
         public void ListMeetings()
         {
-            throw new NotImplementedException();
+            Server.ListMeetings();
         }
 
         public void Connect(string URL)
@@ -65,6 +89,11 @@ namespace Project
                 typeof(ServerInterface),
                 "tcp://localhost:8888/MeetingServer");
             Console.WriteLine("Registei o servidor");
+        }
+
+        public void PrintAllMeetings(string meetings)
+        {
+            Console.WriteLine(meetings);
         }
     }
 }

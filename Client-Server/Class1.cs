@@ -12,6 +12,8 @@ namespace Project
 
         void ListMeetings();
 
+        void PrintAllMeetings(String meetings);
+
         void JoinMeeting(String topic);
 
         void CloseMeeting(String topic);
@@ -23,7 +25,7 @@ namespace Project
     {
         void CreateMeeting(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees);
 
-        String ListMeetings();
+        void ListMeetings();
 
         void JoinMeeting(String topic);
 
