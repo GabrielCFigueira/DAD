@@ -20,24 +20,24 @@ namespace PCS
             TcpChannel channel = new TcpChannel(10000);
             ChannelServices.RegisterChannel(channel, false);
             RemotingConfiguration.RegisterWellKnownServiceType(typeof(PCSImpl), "PCS", WellKnownObjectMode.Singleton);
-            System.Console.WriteLine("<enter> para sair...");
-            System.Console.ReadLine();
+            Console.WriteLine("<enter> to quit...");
+            Console.ReadLine();
         }
     }
 
     class PCSImpl : MarshalByRefObject, IPCS
     {
-        public void createServer(string serverID, int port, int maxFaults, int minDelay, int maxDelay)
+        public void createServer(string serverID, string url, string maxFaults, string minDelay, string maxDelay)
         {
             ProcessStartInfo server = new ProcessStartInfo("..\\..\\..\\Server\\bin\\Debug\\Server.exe");
-            server.Arguments = serverID + " " + port + " " + maxFaults + " " + minDelay + " " + maxDelay;
+            server.Arguments = serverID + " " + url + " " + maxFaults + " " + minDelay + " " + maxDelay;
             Process.Start(server);
         }
 
-        public void createClient(string username, int port, string serverURL, string pathScriptFile) //or should we pass the contents of the file as argument
+        public void createClient(string username, string url, string serverURL, string pathScriptFile) //or should we pass the contents of the file as argument
         {
             ProcessStartInfo client = new ProcessStartInfo("..\\..\\..\\Client\\bin\\Debug\\Client.exe");
-            client.Arguments = username + " " + port + " " + serverURL + " " + pathScriptFile;
+            client.Arguments = username + " " + url + " " + serverURL + " " + pathScriptFile;
             Process.Start(client);
         }
     }

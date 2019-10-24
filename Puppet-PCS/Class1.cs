@@ -8,9 +8,9 @@ namespace Puppet_PCS
 {
     public interface IPCS
     {
-        void createServer(string serverID, int port, int maxFaults, int minDelay, int maxDelay);
+        void createServer(string serverID, string url, string maxFaults, string minDelay, string maxDelay);
 
-        void createClient(string username, int port, string serverURL, string pathScriptFile);
+        void createClient(string username, string url, string serverURL, string pathScriptFile);
 
     }
 }
