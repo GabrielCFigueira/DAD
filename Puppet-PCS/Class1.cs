@@ -6,7 +6,11 @@ using System.Threading.Tasks;
 
 namespace Puppet_PCS
 {
-    public class Class1
+    public interface IPCS
     {
+        void createServer(string serverID, int port, int maxFaults, int minDelay, int maxDelay);
+
+        void createClient(string username, int port, string serverURL, string pathScriptFile);
+
     }
 }
