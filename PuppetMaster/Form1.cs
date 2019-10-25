@@ -46,31 +46,35 @@ namespace PuppetMaster
                 return;
             if (commands.Length < 4)
             {
-
                 PastCommand.Text += "Invalid Command: \"" + command + "\"\r\n";
                 return;
             }
             PastCommand.Text += command + "\r\n";
             string url = commands[2];
 
-            foreach(string pcsURL in pcsList)
+            switch (commands[0])
             {
-                if(pcsURL.Equals(url.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries)[0]))
-                {
-                    IPCS ipcs = (IPCS)Activator.GetObject(typeof(IPCS), "tcp://" + pcsURL + ":10000/PCS");
-                    switch(commands[0])
+                case "Server":
+                case "Client":
+                    foreach (string pcsURL in pcsList)
                     {
-                        case "Server":
-                            ipcs.createServer(commands[1], commands[2], commands[3], commands[4], commands[5]);
-                            break;
-                        case "Client":
-                            ipcs.createClient(commands[1], commands[2], commands[3], commands[4]);
-                            break;
-                        default:
-                            Console.WriteLine("What are doing noob");
-                            break;
+                        if (pcsURL.Equals(url.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries)[0]))
+                        {
+                            IPCS ipcs = (IPCS)Activator.GetObject(typeof(IPCS), "tcp://" + pcsURL + ":10000/PCS");
+                            if (commands[0].Equals("Server"))
+                            {
+                                ipcs.createServer(commands[1], commands[2], commands[3], commands[4], commands[5]);
+                            }
+                            else
+                            {
+                                ipcs.createClient(commands[1], commands[2], commands[3], commands[4]);
+                            }
+                        }
                     }
-                }
+                    break;
+                default:
+                    PastCommand.Text += "What are you doing noob\r\n";
+                    break;
             }
         }
 
