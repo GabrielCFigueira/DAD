@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.Remoting;
 using System.Runtime.Remoting.Channels;
@@ -29,7 +30,37 @@ namespace Project
             ServerInterface server = (ServerInterface)Activator.GetObject(
                 typeof(ServerInterface),
                 serverUrl);
-            server.Connect("tcp://localhost:" + 8000 + "/MeetingClient");
+            server.Connect(clientUrl + "/MeetingClient");
+
+            string command = "";
+            StreamReader file = new StreamReader(scriptFileName);
+            while ((command = file.ReadLine()) != null)
+            {
+                string[] commandParams = command.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                switch (commandParams[0])
+                {
+                    case "list":
+                        MeetingClient.ListMeetings();
+                        break;
+                    case "create":
+                        //TODO
+                        break;
+                    case "join":
+                        //TODO
+                        break;
+                    case "close":
+                        //TODO
+                        break;
+                    case "wait":
+                        //TODO
+                        break;
+                    default:
+                        Console.WriteLine("What are you doing noob\r\n");
+                        break;
+                }
+            }
+
+            file.Close();
 
             /*List<String> date_location = new List<string>();
             date_location.Add("Lisboa,2019-11-14");
@@ -81,12 +112,12 @@ namespace Project
             throw new NotImplementedException();
         }
 
-        public void CreateProposal(String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
+        public void CreateProposal(String topic, int min_attendees, int n_slots, int n_invitees, List<Slot> slots, List<String> invitees)
         {
             Server.CreateProposal(this.UserName, topic, min_attendees, n_slots, n_invitees, slots, invitees);
         }
 
-        public void JoinMeeting(String topic, List<String> slots)
+        public void JoinMeeting(String topic, List<Slot> slots)
         {
 
             Server.JoinMeeting(topic, this.UserName, slots);

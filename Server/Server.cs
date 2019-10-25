@@ -58,14 +58,14 @@ namespace Project
             throw new NotImplementedException();
         }
 
-        public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
+        public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<Slot> slots, List<String> invitees)
         {
             //TODO construir Location e Local_Date
             Proposal m = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, slots, invitees);
             Proposals.Add(m);
         }
 
-        public void JoinMeeting(String topic,String userName, List<String> slots)
+        public void JoinMeeting(String topic,String userName, List<Slot> slots)
         {
             foreach(Meeting m in this.Meetings)
             {
@@ -84,10 +84,11 @@ namespace Project
             foreach (Proposal m in Proposals)
             {
                 message += "Coordinator: " + m.Coordinator + "\r\nTopic: " + m.Topic + "\r\nMin_attendees: " + m.Min_attendees + "\r\nN_slots: " + m.N_slots + " \r\nN_invitees: " + m.N_invitees + "\r\nSlots: ";
-                foreach(String s in m.Slots)
+                //FIXME
+                /*foreach(String s in m.Slots)
                 {
                     message += s + " ";
-                }
+                }*/
                 message += "\r\nInvitees: ";
                 foreach (String s in m.Invitees)
                 {
@@ -97,35 +98,37 @@ namespace Project
                 foreach(Attendee a in m.Attendees)
                 {
                     message += a.Name + ", Available Slots: ";
-                    foreach(String s in a.Available_slots)
+                    //FIXME
+                    /*foreach(String s in a.Available_slots)
                     {
                         message += s + " ";
-                    }
+                    }*/
                 }
                 message += "\r\n\r\n\r\nCLOSED MEETINGS\r\n\r\n";
             }
 
             foreach (Meeting m in Meetings)
             {
-                message += "Coordinator: " + m.Coordinator + "\r\nTopic: " + m.Topic + "\r\nMin_attendees: " + m.Min_attendees + "\r\nN_slots: " + m.N_slots + " \r\nN_invitees: " + m.N_invitees + "\r\nLocal: " + m.Local;
+                message += "Coordinator: " + m.Coordinator + "\r\nTopic: " + m.Topic + "\r\nMin_attendees: " + m.Min_attendees + "\r\nN_slots: " + m.N_slots + " \r\nN_invitees: " + m.N_invitees + "\r\nLocal: " + m.Slot.Location;
                 message += "\r\nInvitees: ";
                 foreach (String s in m.Invitees)
                 {
                     message += s + " ";
                 }
                 message += "\r\nState: ";
-                if (m.State == 0)
+                if (m.IsScheduled)
                     message += "SCHEDULED\r\n";
-                if (m.State == 1)
+                if (!m.IsScheduled)
                     message += "CANCELLED\r\n";
                 message += "\r\nAttendees: ";
                 foreach (Attendee a in m.Attendees)
                 {
                     message += a.Name + ", Available Slots: ";
-                    foreach (String s in a.Available_slots)
+                    //FIXME
+                    /*foreach (String s in a.Available_slots)
                     {
                         message += s + " ";
-                    }
+                    }*/
                 }
                 message += "\r\n\r\n\r\n";
             }
