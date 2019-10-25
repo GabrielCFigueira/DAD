@@ -25,12 +25,15 @@ namespace Project
 
     class ServerImpl : MarshalByRefObject, ServerInterface
     {
-        ClientInterface Client;
+        List<ClientInterface> Clients;
+        List<Proposal> Proposals;
         List<Meeting> Meetings;
 
         public ServerImpl()
         {
             this.Meetings = new List<Meeting>();
+            this.Proposals = new List<Proposal>();
+            this.Clients = new List<ClientInterface>();
         }
 
         public void CloseMeeting(String topic)
@@ -38,21 +41,30 @@ namespace Project
             throw new NotImplementedException();
         }
 
-        public void CreateMeeting(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
+        public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
         {
-            Meeting m = new Meeting(coordinator, topic, min_attendees, n_slots, n_invitees, slots, invitees);
-            Meetings.Add(m);
+            //TODO construir Location e Local_Date
+            Proposal m = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, slots, invitees);
+            Proposals.Add(m);
         }
 
-        public void JoinMeeting(String topic)
+        public void JoinMeeting(String topic,String userName, List<String> slots)
         {
-            throw new NotImplementedException();
+            foreach(Meeting m in this.Meetings)
+            {
+                if(m.Topic == topic)
+                {
+                    Attendee a = new Attendee(userName, slots);
+                    m.Attendees.Add(a);
+                }
+            }
         }
 
         public void ListMeetings()
         {
-            String message = "";
-            foreach (Meeting m in Meetings)
+            //TODO tirar duvidas com o prof
+            String message = "OPEN MEETINGS\r\n\r\n";
+            foreach (Proposal m in Proposals)
             {
                 message += "Coordinator: " + m.Coordinator + "\r\nTopic: " + m.Topic + "\r\nMin_attendees: " + m.Min_attendees + "\r\nN_slots: " + m.N_slots + " \r\nN_invitees: " + m.N_invitees + "\r\nSlots: ";
                 foreach(String s in m.Slots)
@@ -64,100 +76,59 @@ namespace Project
                 {
                     message += s + " ";
                 }
+                message += "\r\nAttendees: ";
+                foreach(Attendee a in m.Attendees)
+                {
+                    message += a.Name + ", Available Slots: ";
+                    foreach(String s in a.Available_slots)
+                    {
+                        message += s + " ";
+                    }
+                }
+                message += "\r\n\r\n\r\nCLOSED MEETINGS\r\n\r\n";
+            }
+
+            foreach (Meeting m in Meetings)
+            {
+                message += "Coordinator: " + m.Coordinator + "\r\nTopic: " + m.Topic + "\r\nMin_attendees: " + m.Min_attendees + "\r\nN_slots: " + m.N_slots + " \r\nN_invitees: " + m.N_invitees + "\r\nLocal: " + m.Local;
+                message += "\r\nInvitees: ";
+                foreach (String s in m.Invitees)
+                {
+                    message += s + " ";
+                }
                 message += "\r\nState: ";
                 if (m.State == 0)
-                    message += "OPEN\r\n";
+                    message += "SCHEDULED\r\n";
                 if (m.State == 1)
-                    message += "CLOSED\r\n";
-                if (m.State == 2)
                     message += "CANCELLED\r\n";
+                message += "\r\nAttendees: ";
+                foreach (Attendee a in m.Attendees)
+                {
+                    message += a.Name + ", Available Slots: ";
+                    foreach (String s in a.Available_slots)
+                    {
+                        message += s + " ";
+                    }
+                }
                 message += "\r\n\r\n\r\n";
             }
-            Client.PrintAllMeetings(message);
+
+            foreach (ClientInterface c in Clients)
+            {
+                c.PrintAllMeetings(message);
+            }
         }
 
         public void Connect(string URL)
         {
-            Client = (ClientInterface)Activator.GetObject(
+            ClientInterface c = (ClientInterface)Activator.GetObject(
                  typeof(ClientInterface),
                  URL);
-            Client.Connect("tcp://localhost:8888/MeetingServer");
+            c.Connect("tcp://localhost:8888/MeetingServer");
+            Clients.Add(c);
             Console.WriteLine("Registei o cliente");
 
         }
-    }
-
-    class Meeting
-    {
-        String coordinator;
-        String topic;
-        int min_attendees;
-        int n_slots;
-        int n_invitees;
-        List<String> slots;
-        List<String> invitees;
-        int state; // 0 means open, 1 means closed and 2 means cancelled
-
-        public String Coordinator
-        {
-            get { return coordinator; }
-            set { coordinator = value; }
-        }
-
-        public String Topic
-        {
-            get { return topic; }
-            set { topic = value; }
-        }
-
-        public int Min_attendees
-        {
-            get { return min_attendees; }
-            set { min_attendees = value; }
-        }
-
-        public int N_slots
-        {
-            get { return n_slots; }
-            set { n_slots = value; }
-        }
-
-        public int N_invitees
-        {
-            get { return n_invitees; }
-            set { n_invitees = value; }
-        }
-
-        public List<String> Slots
-        {
-            get { return slots; }
-            set { slots = value; }
-        }
-
-        public List<String> Invitees
-        {
-            get { return invitees; }
-            set { invitees = value; }
-        }
-
-        public int State
-        {
-            get { return state; }
-            set { state = value; }
-        }
-
-        public Meeting(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
-        {
-            this.Coordinator = coordinator;
-            this.Topic = topic;
-            this.Min_attendees = min_attendees;
-            this.N_slots = n_slots;
-            this.N_invitees = n_invitees;
-            this.Slots = slots;
-            this.Invitees = invitees;
-            this.State = 0;
-        }
-
     }
 
 }

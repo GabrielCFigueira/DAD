@@ -24,7 +24,7 @@ namespace Project
                 "tcp://localhost:8888/MeetingServer");
             server.Connect("tcp://localhost:" + 8000 + "/MeetingClient");
 
-            List<String> date_location = new List<string>();
+            /*List<String> date_location = new List<string>();
             date_location.Add("Lisboa,2019-11-14");
             date_location.Add("Porto,2020-02-03");
 
@@ -35,7 +35,7 @@ namespace Project
 
             MeetingClient.CreateMeeting("Budget_2020", 5, 2, 3, date_location, invitees);
 
-            List<String> date_location2 = new List<string>();
+            /*List<String> date_location2 = new List<string>();
             date_location2.Add("Setubal,2019-11-14");
             date_location2.Add("Braga,2020-02-03");
 
@@ -47,6 +47,12 @@ namespace Project
             MeetingClient.CreateMeeting("Pokemon_GO", 5, 2, 3, date_location2, invitees2);
 
             MeetingClient.ListMeetings();
+            List<String> slots = new List<String>();
+            slots.Add("Lisboa,2019-11-14");
+            slots.Add("Porto,2020-02-03");
+            MeetingClient.JoinMeeting("Budget_2020", slots);
+
+            MeetingClient.ListMeetings();*/
 
             System.Console.ReadLine();
 
@@ -68,14 +74,15 @@ namespace Project
             throw new NotImplementedException();
         }
 
-        public void CreateMeeting(String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
+        public void CreateProposal(String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
         {
-            Server.CreateMeeting(this.UserName, topic, min_attendees, n_slots, n_invitees, slots, invitees);
+            Server.CreateProposal(this.UserName, topic, min_attendees, n_slots, n_invitees, slots, invitees);
         }
 
-        public void JoinMeeting(String topic)
+        public void JoinMeeting(String topic, List<String> slots)
         {
-            throw new NotImplementedException();
+
+            Server.JoinMeeting(topic, this.UserName, slots);
         }
 
         public void ListMeetings()
