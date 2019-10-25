@@ -83,5 +83,9 @@ namespace PuppetMaster
 
         }
 
+        private void PuppetMaster_Load(object sender, EventArgs e)
+        {
+
+        }
     }
 }

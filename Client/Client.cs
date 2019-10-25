@@ -14,14 +14,21 @@ namespace Project
 
         static void Main(string[] args)
         {
-            TcpChannel channel = new TcpChannel(8000);
+            String userName = args[1];
+            String clientUrl = args[2];
+            String serverUrl = args[3];
+            String scriptFileName = args[4];
+
+            Uri clientUri = new Uri(clientUrl);
+
+            TcpChannel channel = new TcpChannel(clientUri.Port);
             ChannelServices.RegisterChannel(channel, false);
 
             ClientImpl MeetingClient = new ClientImpl("Ze");
             RemotingServices.Marshal(MeetingClient, "MeetingClient", typeof(ClientImpl));
             ServerInterface server = (ServerInterface)Activator.GetObject(
                 typeof(ServerInterface),
-                "tcp://localhost:8888/MeetingServer");
+                serverUrl);
             server.Connect("tcp://localhost:" + 8000 + "/MeetingClient");
 
             /*List<String> date_location = new List<string>();

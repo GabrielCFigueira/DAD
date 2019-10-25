@@ -13,10 +13,17 @@ namespace Project
     {
         static void Main(string[] args)
         {
-            TcpChannel channel = new TcpChannel(8888);
+            int id = Int32.Parse(args[1]);
+            String url = args[2];
+            int maxFaults = Int32.Parse(args[3]);
+            int minDelay = Int32.Parse(args[4]);
+            int maxDelay = Int32.Parse(args[5]);
+
+            Uri uri = new Uri(url);
+            TcpChannel channel = new TcpChannel(uri.Port);
             ChannelServices.RegisterChannel(channel, false);
 
-            ServerImpl MeetingServer = new ServerImpl();
+            ServerImpl MeetingServer = new ServerImpl(id,url,maxFaults,minDelay,maxDelay);
             RemotingServices.Marshal(MeetingServer, "MeetingServer", typeof(ServerImpl));
 
             System.Console.ReadLine();
@@ -26,11 +33,21 @@ namespace Project
     class ServerImpl : MarshalByRefObject, ServerInterface
     {
         List<ClientInterface> Clients;
-        List<Proposal> Proposals;
-        List<Meeting> Meetings;
+        List<Proposal> Proposals; //alterar para mapa<topic,List<proposal>>
+        List<Meeting> Meetings;   //alterar para mapa<Location,List<Meeting>>
+        int id;
+        String url;
+        int maxFaults;
+        int minDelay;
+        int maxDelay;
 
-        public ServerImpl()
+        public ServerImpl(int id, String url, int maxFaults, int minDelay, int maxDelay)
         {
+            this.id = id;
+            this.url = url;
+            this.maxFaults = maxFaults;
+            this.minDelay = minDelay;
+            this.maxDelay = maxDelay;
             this.Meetings = new List<Meeting>();
             this.Proposals = new List<Proposal>();
             this.Clients = new List<ClientInterface>();
