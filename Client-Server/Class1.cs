@@ -42,9 +42,10 @@ namespace Project
         int min_attendees;
         int n_slots;
         int n_invitees;
-        String local;
+        Slot slot;
         List<String> invitees;
-        int state; // 0 means scheduled, 1 means cancelled
+        Boolean isScheduled; // True means scheduled, False means cancelled
+        Boolean isCancelled; // True means cancelled, False means schedulled
         List<Attendee> attendees;
 
         public String Coordinator
@@ -77,10 +78,10 @@ namespace Project
             set { n_invitees = value; }
         }
 
-        public String Local
+        public Slot Slot
         {
-            get { return local; }
-            set { local = value; }
+            get { return slot; }
+            set { slot = value; }
         }
 
         public List<String> Invitees
@@ -89,11 +90,16 @@ namespace Project
             set { invitees = value; }
         }
 
-        public int State
+        public Boolean IsScheduled
         {
-            get { return state; }
-            set { state = value; }
+            get { return isScheduled; }
+            set { isScheduled = value; }
         }
+        //public Boolean IsCancelled
+        //{
+        //    get { return isCancelled; }
+        //    set { isCancelled = value; _ = isScheduled != value; }  //TODO testar isto!
+        //}
 
         public List<Attendee> Attendees
         {
@@ -101,16 +107,16 @@ namespace Project
             set { attendees = value; }
         }
 
-        public Meeting(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, String local, List<String> invitees)
+        public Meeting(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, Slot slot, List<String> invitees)
         {
             this.Coordinator = coordinator;
             this.Topic = topic;
             this.Min_attendees = min_attendees;
             this.N_slots = n_slots;
             this.N_invitees = n_invitees;
-            this.Local = local;
+            this.slot = slot;
             this.Invitees = invitees;
-            this.State = 0;
+            this.isScheduled = false;
             this.Attendees = new List<Attendee>();
         }
 
@@ -119,9 +125,9 @@ namespace Project
     public class Attendee
     {
         String name;
-        List<String> available_slots;
+        List<Slot> available_slots;
 
-        public Attendee(String Name, List<String> Available_slots)
+        public Attendee(String Name, List<Slot> Available_slots)
         {
             this.name = Name;
             this.available_slots = Available_slots;
@@ -133,7 +139,7 @@ namespace Project
             set { name = value; }
         }
 
-        public List<String> Available_slots
+        public List<Slot> Available_slots
         {
             get { return available_slots; }
             set { available_slots = value; }
@@ -262,10 +268,11 @@ namespace Project
         }
     }
 
-    public class Local_Date
+    public class Slot
     {
         Location location;
         String date;
+        int votes;
 
         public Location Location
         {
@@ -279,10 +286,11 @@ namespace Project
             set { date = value; }
         }
 
-        public Local_Date(Location location, String date)
+        public Slot(Location location, String date)
         {
             this.location = location;
             this.date = date;
+            this.votes = 0;
         }
     }
 }
