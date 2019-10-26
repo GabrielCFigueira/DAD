@@ -12,5 +12,7 @@ namespace Puppet_PCS
 
         void createClient(string username, string url, string serverURL, string pathScriptFile);
 
+        void shutdown();
+
     }
 }

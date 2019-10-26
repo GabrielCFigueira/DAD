@@ -9,7 +9,9 @@ using System.Runtime.Remoting;
 using System.Runtime.Remoting.Channels;
 using System.Runtime.Remoting.Channels.Tcp;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace PCS
 {
@@ -39,6 +41,18 @@ namespace PCS
             ProcessStartInfo client = new ProcessStartInfo(@"..\..\..\Client\bin\Debug\Client.exe");
             client.Arguments = username + " " + url + " " + serverURL + " " + pathScriptFile;
             Process.Start(client);
+        }
+
+        public void shutdown()
+        {
+            Thread thread = new Thread(new ThreadStart(localShutdown));
+            thread.Start();
+        }
+
+        private void localShutdown()
+        {
+            Thread.Sleep(2000);
+            Environment.Exit(0);
         }
     }
 

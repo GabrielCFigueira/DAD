@@ -115,6 +115,9 @@ namespace PuppetMaster
                 case "Client":
                     createClient(commands[1], commands[2], commands[3], commands[4]);
                     return command;
+                case "Shutdown":
+                    shutdown();
+                    return "Shutdown";
                 default:
                     return "What are you doing noob";
             }
@@ -144,6 +147,22 @@ namespace PuppetMaster
                 }
             }
             serverList.Add(url);
+        }
+
+        public void shutdown()
+        {
+            foreach(string url in pcsList)
+            {
+                IPCS ipcs = (IPCS)Activator.GetObject(typeof(IPCS), "tcp://" + url + ":10000/PCS");
+                ipcs.shutdown();
+            }
+
+            foreach(string url in serverList)
+            {
+
+            }
+
+            Environment.Exit(0);
         }
 
         public List<string> getServers()
