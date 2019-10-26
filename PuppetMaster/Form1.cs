@@ -1,4 +1,5 @@
 ﻿using Puppet_PCS;
+using Puppet_Server;
 
 
 using System;
@@ -19,10 +20,12 @@ namespace PuppetMaster
     {
 
         private List<string> pcsList = new List<string>();
-
+        private PuppetMasterImp pmi;
+        
         public PuppetMaster()
         {
             InitializeComponent();
+            pmi = new PuppetMasterImp();
             System.IO.StreamReader file = new System.IO.StreamReader("..\\..\\PCShostnames.txt");
 
             string line;
@@ -52,6 +55,9 @@ namespace PuppetMaster
             PastCommand.Text += command + "\r\n";
             string url = commands[2];
 
+            //Add server
+            pmi.addServer(url);
+
             switch (commands[0])
             {
                 case "Server":
@@ -78,6 +84,24 @@ namespace PuppetMaster
             }
         }
 
+        private void button2_Click(object sender, EventArgs e)
+        {
+            string command = CommandBox.Text;
+            CommandBox.Text = "";
+            string[] commands = command.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            if (commands.Length == 0)
+                return;
+            if (commands.Length < 3)
+            {
+                PastCommand.Text += "Invalid Command: \"" + command + "\"\r\n";
+                return;
+            }
+
+            foreach (String serverURL in pmi.getServers())
+            {
+            }
+        }
+
         private void PastCommand_TextChanged(object sender, EventArgs e)
         {
 
@@ -86,6 +110,50 @@ namespace PuppetMaster
         private void PuppetMaster_Load(object sender, EventArgs e)
         {
 
+        }
+    }
+
+    public class PuppetMasterImp : IPS
+    {
+        private List<String> serverList;
+        public PuppetMasterImp()
+        {
+            serverList = new List<String>();
+        }
+
+        public void addServer(string serverURL)
+        {
+            serverList.Add(serverURL);
+        }
+
+        public List<string> getServers()
+        {
+            return serverList;
+        }
+
+        public void AddRoom(string location, int capacity, string room_name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Crash(string server_id)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Freeze(string server_id)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Status()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Unfreeze(string server_id)
+        {
+            throw new NotImplementedException();
         }
     }
 }
