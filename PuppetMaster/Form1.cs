@@ -19,7 +19,6 @@ namespace PuppetMaster
     public partial class PuppetMaster : Form
     {
 
-        private List<string> pcsList = new List<string>();
         private PuppetMasterImp pmi;
         
         public PuppetMaster()
@@ -31,7 +30,13 @@ namespace PuppetMaster
             string line;
             while ((line = file.ReadLine()) != null)
             {
-                pcsList.Add(line);
+                pmi.addPCS(line);
+            }
+
+            file = new System.IO.StreamReader("..\\..\\Commands.txt");
+            while ((line = file.ReadLine()) != null)
+            {
+                pmi.readCommand(line);
             }
         }
 
@@ -47,41 +52,11 @@ namespace PuppetMaster
             string[] commands = command.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
             if (commands.Length == 0)
                 return;
-            if (commands.Length < 4)
-            {
-                PastCommand.Text += "Invalid Command: \"" + command + "\"\r\n";
-                return;
-            }
-            PastCommand.Text += command + "\r\n";
-            string url = commands[2];
 
-            //Add server
-            pmi.addServer(url);
+            PastCommand.Text += pmi.readCommand(command) + "\r\n";
 
-            switch (commands[0])
-            {
-                case "Server":
-                case "Client":
-                    foreach (string pcsURL in pcsList)
-                    {
-                        if (pcsURL.Equals(url.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries)[0]))
-                        {
-                            IPCS ipcs = (IPCS)Activator.GetObject(typeof(IPCS), "tcp://" + pcsURL + ":10000/PCS");
-                            if (commands[0].Equals("Server"))
-                            {
-                                ipcs.createServer(commands[1], commands[2], commands[3], commands[4], commands[5]);
-                            }
-                            else
-                            {
-                                ipcs.createClient(commands[1], commands[2], commands[3], commands[4]);
-                            }
-                        }
-                    }
-                    break;
-                default:
-                    PastCommand.Text += "What are you doing noob\r\n";
-                    break;
-            }
+
+     
         }
 
         private void button2_Click(object sender, EventArgs e)
@@ -115,15 +90,60 @@ namespace PuppetMaster
 
     public class PuppetMasterImp : IPS
     {
-        private List<String> serverList;
+        private List<string> pcsList;
+        private List<string> serverList;
+
         public PuppetMasterImp()
         {
-            serverList = new List<String>();
+            serverList = new List<string>();
+            pcsList = new List<string>();
         }
 
-        public void addServer(string serverURL)
+        public void addPCS(string url)
         {
-            serverList.Add(serverURL);
+            pcsList.Add(url);
+        }
+
+        public string readCommand(string command)
+        {
+            string[] commands = command.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            switch (commands[0])
+            {
+                case "Server":
+                    createServer(commands[1], commands[2], commands[3], commands[4], commands[5]);
+                    return command;
+                case "Client":
+                    createClient(commands[1], commands[2], commands[3], commands[4]);
+                    return command;
+                default:
+                    return "What are you doing noob";
+            }
+        }
+
+        public void createServer(string serverID, string url, string maxFaults, string minDelay, string maxDelay)
+        {
+            foreach (string pcsURL in pcsList)
+            {
+                if (pcsURL.Equals(url.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries)[0]))
+                {
+                    IPCS ipcs = (IPCS)Activator.GetObject(typeof(IPCS), "tcp://" + pcsURL + ":10000/PCS");
+                    ipcs.createServer(serverID, url, maxFaults, minDelay, maxDelay);
+                }
+            }
+            serverList.Add(url);
+        }
+
+        public void createClient(string username, string url, string serverURL, string pathScriptFile)
+        {
+            foreach (string pcsURL in pcsList)
+            {
+                if (pcsURL.Equals(url.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries)[0]))
+                {
+                    IPCS ipcs = (IPCS)Activator.GetObject(typeof(IPCS), "tcp://" + pcsURL + ":10000/PCS");
+                    ipcs.createClient(username, url, serverURL, pathScriptFile);
+                }
+            }
+            serverList.Add(url);
         }
 
         public List<string> getServers()

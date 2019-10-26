@@ -29,14 +29,14 @@ namespace PCS
     {
         public void createServer(string serverID, string url, string maxFaults, string minDelay, string maxDelay)
         {
-            ProcessStartInfo server = new ProcessStartInfo(@"..\\..\\..\\Server\\bin\\Debug\\Server.exe"); //@ necessaria??
+            ProcessStartInfo server = new ProcessStartInfo(@"..\..\..\Server\bin\Debug\Server.exe");
             server.Arguments = serverID + " " + url + " " + maxFaults + " " + minDelay + " " + maxDelay;
             Process.Start(server);
         }
 
         public void createClient(string username, string url, string serverURL, string pathScriptFile) //or should we pass the contents of the file as argument
         {
-            ProcessStartInfo client = new ProcessStartInfo(@"..\\..\\..\\Client\\bin\\Debug\\Client.exe");
+            ProcessStartInfo client = new ProcessStartInfo(@"..\..\..\Client\bin\Debug\Client.exe");
             client.Arguments = username + " " + url + " " + serverURL + " " + pathScriptFile;
             Process.Start(client);
         }
