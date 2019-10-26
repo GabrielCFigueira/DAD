@@ -8,13 +8,13 @@ namespace Project
 {
     public interface ClientInterface
     {
-        void CreateProposal(String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees);
+        void CreateProposal(String topic, int min_attendees, int n_slots, int n_invitees, List<Slot> slots, List<String> invitees);
 
         void ListMeetings();
 
         void PrintAllMeetings(String meetings);
 
-        void JoinMeeting(String topic, List<String> slots); //n_slots necessary?
+        void JoinMeeting(String topic, List<Slot> slots); //n_slots necessary?
 
         void CloseMeeting(String topic);
         void Connect(String URL);
@@ -23,11 +23,11 @@ namespace Project
 
     public interface ServerInterface
     {
-        void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees);
+        void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<Slot> slots, List<String> invitees);
 
         void ListMeetings();
 
-        void JoinMeeting(String topic, String userName, List<String> slots);
+        void JoinMeeting(String topic, String userName, List<Slot> slots);
 
         void CloseMeeting(String topic);
 
@@ -154,7 +154,7 @@ namespace Project
         int min_attendees;
         int n_slots;
         int n_invitees;
-        List<String> slots;
+        List<Slot> slots;
         List<String> invitees;
         List<Attendee> attendees;
 
@@ -188,7 +188,7 @@ namespace Project
             set { n_invitees = value; }
         }
 
-        public List<String> Slots
+        public List<Slot> Slots
         {
             get { return slots; }
             set { slots = value; }
@@ -206,7 +206,7 @@ namespace Project
             set { attendees = value; }
         }
 
-        public Proposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
+        public Proposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<Slot> slots, List<String> invitees)
         {
             this.Coordinator = coordinator;
             this.Topic = topic;
