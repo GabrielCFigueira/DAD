@@ -6,6 +6,7 @@ using System.Runtime.Remoting;
 using System.Runtime.Remoting.Channels;
 using System.Runtime.Remoting.Channels.Tcp;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Project
@@ -25,7 +26,7 @@ namespace Project
             TcpChannel channel = new TcpChannel(clientUri.Port);
             ChannelServices.RegisterChannel(channel, false);
 
-            ClientImpl MeetingClient = new ClientImpl("Ze");
+            ClientImpl MeetingClient = new ClientImpl(userName);
             RemotingServices.Marshal(MeetingClient, "MeetingClient", typeof(ClientImpl));
             ServerInterface server = (ServerInterface)Activator.GetObject(
                 typeof(ServerInterface),
@@ -43,16 +44,43 @@ namespace Project
                         MeetingClient.ListMeetings();
                         break;
                     case "create":
-                        //TODO
+                        String meetingTopic = commandParams[1];
+                        int min_attendees = Int32.Parse(commandParams[2]);
+                        int n_slots = Int32.Parse(commandParams[3]);
+                        int n_invitees = Int32.Parse(commandParams[4]);
+                        List<String> meeting_slots = new List<String>();
+                        List<String> invitees = new List<String>();
+                        for (int i = 5; i < n_slots + 5; i++)
+                        {
+                            string slot = commandParams[i];
+                            meeting_slots.Add(slot);
+                        }
+                        for (int i = 5 + n_slots; i < n_invitees + 5 + n_slots; i++)
+                        {
+                            string invitee = commandParams[i];
+                            invitees.Add(invitee);
+                        }
+                        MeetingClient.CreateProposal(meetingTopic, min_attendees, n_slots, n_invitees, meeting_slots, invitees);
                         break;
                     case "join":
-                        //TODO
+                        String topic = commandParams[1];
+                        int slot_count = Int32.Parse(commandParams[2]);
+                        List<String> slots = new List<String>();
+                        for(int i=3; i < slot_count + 3; i++)
+                        {
+                            string slot = commandParams[i];
+                            slots.Add(slot);
+                        }
+                        MeetingClient.JoinMeeting(topic, slots);
                         break;
                     case "close":
-                        //TODO
+                        String meeting_topic = commandParams[1];
+                        MeetingClient.CloseMeeting(meeting_topic);
                         break;
                     case "wait":
-                        //TODO
+                        int interval = Int32.Parse(commandParams[1]);
+                        Thread.Sleep(interval);
+                        //TODO wait x milisseconds of the next command
                         break;
                     default:
                         Console.WriteLine("What are you doing noob\r\n");
@@ -61,36 +89,6 @@ namespace Project
             }
 
             file.Close();
-
-            /*List<String> date_location = new List<string>();
-            date_location.Add("Lisboa,2019-11-14");
-            date_location.Add("Porto,2020-02-03");
-
-            List<String> invitees = new List<string>();
-            invitees.Add("Maria");
-            invitees.Add("Johny");
-            invitees.Add("Tiago");
-
-            MeetingClient.CreateMeeting("Budget_2020", 5, 2, 3, date_location, invitees);
-
-            /*List<String> date_location2 = new List<string>();
-            date_location2.Add("Setubal,2019-11-14");
-            date_location2.Add("Braga,2020-02-03");
-
-            List<String> invitees2 = new List<string>();
-            invitees2.Add("Tatiana");
-            invitees2.Add("Laura");
-            invitees2.Add("Daniel");
-
-            MeetingClient.CreateMeeting("Pokemon_GO", 5, 2, 3, date_location2, invitees2);
-
-            MeetingClient.ListMeetings();
-            List<String> slots = new List<String>();
-            slots.Add("Lisboa,2019-11-14");
-            slots.Add("Porto,2020-02-03");
-            MeetingClient.JoinMeeting("Budget_2020", slots);
-
-            MeetingClient.ListMeetings();*/
 
             System.Console.ReadLine();
 
@@ -112,12 +110,12 @@ namespace Project
             throw new NotImplementedException();
         }
 
-        public void CreateProposal(String topic, int min_attendees, int n_slots, int n_invitees, List<Slot> slots, List<String> invitees)
+        public void CreateProposal(String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
         {
             Server.CreateProposal(this.UserName, topic, min_attendees, n_slots, n_invitees, slots, invitees);
         }
 
-        public void JoinMeeting(String topic, List<Slot> slots)
+        public void JoinMeeting(String topic, List<String> slots)
         {
 
             Server.JoinMeeting(topic, this.UserName, slots);
@@ -128,11 +126,11 @@ namespace Project
             Server.ListMeetings();
         }
 
-        public void Connect(string URL)
+        public void Connect(String server_URL)
         {
             Server = (ServerInterface)Activator.GetObject(
                 typeof(ServerInterface),
-                "tcp://localhost:8888/MeetingServer");
+                server_URL + "/MeetingServer");
             Console.WriteLine("Registei o servidor");
         }
 

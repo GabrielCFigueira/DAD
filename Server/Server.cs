@@ -33,13 +33,14 @@ namespace Project
     class ServerImpl : MarshalByRefObject, ServerInterface
     {
         List<ClientInterface> Clients;
-        List<Proposal> Proposals; //alterar para mapa<topic,List<proposal>>
-        List<Meeting> Meetings;   //alterar para mapa<Location,List<Meeting>>
+        Dictionary<String,Proposal> Proposals;
+        Dictionary<Location,List<Meeting>> Meetings;
         int id;
         String url;
         int maxFaults;
         int minDelay;
         int maxDelay;
+        List<Room> rooms = new List<Room>(); //just to test the functions. Clear this after
 
         public ServerImpl(int id, String url, int maxFaults, int minDelay, int maxDelay)
         {
@@ -48,9 +49,17 @@ namespace Project
             this.maxFaults = maxFaults;
             this.minDelay = minDelay;
             this.maxDelay = maxDelay;
-            this.Meetings = new List<Meeting>();
-            this.Proposals = new List<Proposal>();
+            this.Meetings = new Dictionary<Location, List<Meeting>>();
+            this.Proposals = new Dictionary<string, Proposal>();
             this.Clients = new List<ClientInterface>();
+
+            //JUST TO TEST,CLEAN AFTER
+            Room a = new Room("A", 20);
+            Room b = new Room("B", 10);
+            Room c = new Room("C", 30);
+            this.rooms.Add(a);
+            this.rooms.Add(b);
+            this.rooms.Add(c);
         }
 
         public void CloseMeeting(String topic)
@@ -58,79 +67,95 @@ namespace Project
             throw new NotImplementedException();
         }
 
-        public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<Slot> slots, List<String> invitees)
+        public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
         {
+            List<Slot> Slots = new List<Slot>();
             //TODO construir Location e Local_Date
-            Proposal m = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, slots, invitees);
-            Proposals.Add(m);
+            foreach(String s in slots)
+            {
+                string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
+                Location loc = new Location(zone_date[0], this.rooms);
+                Slot slot = new Slot(loc,zone_date[1]);
+                Slots.Add(slot);
+            }
+            Proposal m = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, Slots, invitees);
+            Proposals.Add(m.Topic, m);
         }
 
-        public void JoinMeeting(String topic,String userName, List<Slot> slots)
+        public void JoinMeeting(String topic,String userName, List<String> slots)
         {
-            foreach(Meeting m in this.Meetings)
+            List<Slot> Slots = new List<Slot>();
+            foreach (String s in slots)
             {
-                if(m.Topic == topic)
-                {
-                    Attendee a = new Attendee(userName, slots);
-                    m.Attendees.Add(a);
-                }
+                string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
+                Location loc = new Location(zone_date[0], this.rooms);
+                Slot slot = new Slot(loc, zone_date[1]);
+                Slots.Add(slot);
             }
+
+            Attendee a = new Attendee(userName, Slots);
+            Proposal p;
+            this.Proposals.TryGetValue(topic, out p); //Test this
+            p.Attendees.Add(a);
+
         }
 
         public void ListMeetings()
         {
             //TODO tirar duvidas com o prof
             String message = "OPEN MEETINGS\r\n\r\n";
-            foreach (Proposal m in Proposals)
+            foreach (KeyValuePair<String, Proposal> entry in Proposals)
             {
-                message += "Coordinator: " + m.Coordinator + "\r\nTopic: " + m.Topic + "\r\nMin_attendees: " + m.Min_attendees + "\r\nN_slots: " + m.N_slots + " \r\nN_invitees: " + m.N_invitees + "\r\nSlots: ";
-                //FIXME
-                /*foreach(String s in m.Slots)
+                Proposal p = entry.Value;
+                message += "Coordinator: " + p.Coordinator + "\r\nTopic: " + p.Topic + "\r\nMin_attendees: " + p.Min_attendees + "\r\nN_slots: " + p.N_slots + " \r\nN_invitees: " + p.N_invitees + "\r\nSlots: ";
+                foreach(Slot s in p.Slots)
                 {
-                    message += s + " ";
-                }*/
+                    message += s.Location + "," + s.Date + " ";
+                }
                 message += "\r\nInvitees: ";
-                foreach (String s in m.Invitees)
+                foreach (String s in p.Invitees)
                 {
                     message += s + " ";
                 }
                 message += "\r\nAttendees: ";
-                foreach(Attendee a in m.Attendees)
+                foreach(Attendee a in p.Attendees)
                 {
                     message += a.Name + ", Available Slots: ";
-                    //FIXME
-                    /*foreach(String s in a.Available_slots)
+                    foreach(Slot s in a.Available_slots)
                     {
-                        message += s + " ";
-                    }*/
+                        message += s.Location + "," + s.Date + " ";
+                    }
                 }
                 message += "\r\n\r\n\r\nCLOSED MEETINGS\r\n\r\n";
             }
 
-            foreach (Meeting m in Meetings)
+            foreach (KeyValuePair<Location, List<Meeting>> e in Meetings)
             {
-                message += "Coordinator: " + m.Coordinator + "\r\nTopic: " + m.Topic + "\r\nMin_attendees: " + m.Min_attendees + "\r\nN_slots: " + m.N_slots + " \r\nN_invitees: " + m.N_invitees + "\r\nLocal: " + m.Slot.Location;
-                message += "\r\nInvitees: ";
-                foreach (String s in m.Invitees)
+                List<Meeting> meet_list = e.Value;
+                foreach (Meeting m in meet_list)
                 {
-                    message += s + " ";
-                }
-                message += "\r\nState: ";
-                if (m.IsScheduled)
-                    message += "SCHEDULED\r\n";
-                if (!m.IsScheduled)
-                    message += "CANCELLED\r\n";
-                message += "\r\nAttendees: ";
-                foreach (Attendee a in m.Attendees)
-                {
-                    message += a.Name + ", Available Slots: ";
-                    //FIXME
-                    /*foreach (String s in a.Available_slots)
+                    message += "Coordinator: " + m.Coordinator + "\r\nTopic: " + m.Topic + "\r\nMin_attendees: " + m.Min_attendees + "\r\nN_slots: " + m.N_slots + " \r\nN_invitees: " + m.N_invitees + "\r\nLocal: " + m.Slot.Location;
+                    message += "\r\nInvitees: ";
+                    foreach (String s in m.Invitees)
                     {
                         message += s + " ";
-                    }*/
+                    }
+                    message += "\r\nState: ";
+                    if (m.IsScheduled)
+                        message += "SCHEDULED\r\n";
+                    if (!m.IsScheduled)
+                        message += "CANCELLED\r\n";
+                    message += "\r\nAttendees: ";
+                    foreach (Attendee a in m.Attendees)
+                    {
+                        message += a.Name + ", Available Slots: ";
+                        foreach (Slot s in a.Available_slots)
+                        {
+                            message += s.Location + "," + s.Date + " ";
+                        }
+                    }
+                    message += "\r\n\r\n\r\n";
                 }
-                message += "\r\n\r\n\r\n";
             }
 
             foreach (ClientInterface c in Clients)
@@ -139,12 +164,12 @@ namespace Project
             }
         }
 
-        public void Connect(string URL)
+        public void Connect(string client_URL)
         {
             ClientInterface c = (ClientInterface)Activator.GetObject(
                  typeof(ClientInterface),
-                 URL);
-            c.Connect("tcp://localhost:8888/MeetingServer");
+                 client_URL);
+            c.Connect(this.url + "/MeetingServer");
             Clients.Add(c);
             Console.WriteLine("Registei o cliente");
 

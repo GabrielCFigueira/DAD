@@ -8,13 +8,13 @@ namespace Project
 {
     public interface ClientInterface
     {
-        void CreateProposal(String topic, int min_attendees, int n_slots, int n_invitees, List<Slot> slots, List<String> invitees);
+        void CreateProposal(String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees);
 
         void ListMeetings();
 
         void PrintAllMeetings(String meetings);
 
-        void JoinMeeting(String topic, List<Slot> slots); //n_slots necessary?
+        void JoinMeeting(String topic, List<String> slots); //n_slots necessary?
 
         void CloseMeeting(String topic);
         void Connect(String URL);
@@ -23,11 +23,11 @@ namespace Project
 
     public interface ServerInterface
     {
-        void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<Slot> slots, List<String> invitees);
+        void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees);
 
         void ListMeetings();
 
-        void JoinMeeting(String topic, String userName, List<Slot> slots);
+        void JoinMeeting(String topic, String userName, List<String> slots);
 
         void CloseMeeting(String topic);
 
@@ -45,7 +45,6 @@ namespace Project
         Slot slot;
         List<String> invitees;
         Boolean isScheduled; // True means scheduled, False means cancelled
-        Boolean isCancelled; // True means cancelled, False means schedulled
         List<Attendee> attendees;
 
         public String Coordinator
@@ -95,11 +94,6 @@ namespace Project
             get { return isScheduled; }
             set { isScheduled = value; }
         }
-        //public Boolean IsCancelled
-        //{
-        //    get { return isCancelled; }
-        //    set { isCancelled = value; _ = isScheduled != value; }  //TODO testar isto!
-        //}
 
         public List<Attendee> Attendees
         {
