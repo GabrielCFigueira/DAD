@@ -22,11 +22,13 @@ namespace Puppet_Server
 
     public interface IServerPuppet
     {
-        void AddRoom(String location, int capacity, String room_name);
+        /* void AddRoom(String location, int capacity, String room_name);
 
-        void Status();
-        void Crash(String server_id);
-        void Freeze(String server_id);
-        void Unfreeze(String server_id);
+         void Status();
+         void Crash(String server_id);
+         void Freeze(String server_id);
+         void Unfreeze(String server_id); */
+
+        void shutdown();
     }
 }

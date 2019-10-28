@@ -72,7 +72,7 @@ namespace PuppetMaster
                 return;
             }
 
-            foreach (String serverURL in pmi.getServers())
+            foreach (Uri serverURL in pmi.getServers())
             {
                 int capacity = Int32.Parse(commands[1]);
                 pmi.AddRoom(commands[0], capacity, commands[2], serverURL);
@@ -100,23 +100,30 @@ namespace PuppetMaster
 
     public class PuppetMasterImp : IPuppet
     {
-        private List<string> pcsList;
-        private List<string> serverList;
+        private List<Uri> pcsList;
+        private List<Uri> serverList;
+        private List<Uri> clientList;
 
         public PuppetMasterImp()
         {
-            serverList = new List<string>();
-            pcsList = new List<string>();
+            serverList = new List<Uri>();
+            pcsList = new List<Uri>();
+            clientList = new List<Uri>();
         }
 
         public void addPCS(string url)
         {
-            pcsList.Add(url);
+            pcsList.Add(new Uri(url));
         }
 
-        public List<string> getServers()
+        public void addServer(string url)
         {
-            return serverList;
+            serverList.Add(new Uri(url));
+        }
+
+        public void addClient(string url)
+        {
+            clientList.Add(new Uri(url));
         }
 
         public string readCommand(string command)
@@ -140,47 +147,51 @@ namespace PuppetMaster
 
         public void createServer(string serverID, string url, string maxFaults, string minDelay, string maxDelay)
         {
-            foreach (string pcsURL in pcsList)
+            foreach (Uri pcsURL in pcsList)
             {
-                if (pcsURL.Equals(url.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries)[0]))
+                if (pcsURL.Host == (new Uri(url)).Host)
                 {
-                    IPCS ipcs = (IPCS)Activator.GetObject(typeof(IPCS), "tcp://" + pcsURL + ":10000/PCS");
-                    PastCommand.Text += serverID + url + maxFaults + minDelay + maxDelay;
+                    IPCS ipcs = (IPCS)Activator.GetObject(typeof(IPCS), pcsURL.AbsoluteUri);
                     ipcs.createServer(serverID, url, maxFaults, minDelay, maxDelay);
+                    break;
                 }
             }
-            serverList.Add(url);
+            addServer(url);
         }
 
         public void createClient(string username, string url, string serverURL, string pathScriptFile)
         {
-            foreach (string pcsURL in pcsList)
+            foreach (Uri pcsURL in pcsList)
             {
-                if (pcsURL.Equals(url.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries)[0]))
+                if (pcsURL.Host == (new Uri(url)).Host)
                 {
-                    IPCS ipcs = (IPCS)Activator.GetObject(typeof(IPCS), "tcp://" + pcsURL + ":10000/PCS");
+                    IPCS ipcs = (IPCS)Activator.GetObject(typeof(IPCS), pcsURL.AbsoluteUri);
                     ipcs.createClient(username, url, serverURL, pathScriptFile);
+                    break;
                 }
             }
+            addClient(url);
         }
 
         public void shutdown()
         {
-            foreach(string url in pcsList)
+            foreach(Uri url in pcsList)
             {
-                IPCS ipcs = (IPCS)Activator.GetObject(typeof(IPCS), "tcp://" + url + ":10000/PCS");
+                IPCS ipcs = (IPCS)Activator.GetObject(typeof(IPCS), url.AbsoluteUri);
                 ipcs.shutdown();
             }
 
-            foreach(string url in serverList)
+            foreach(Uri url in serverList)
             {
-
+                IPS ips = (IPS)Activator.GetObject(typeof(IPS), url.AbsoluteUri);
+                ips.shutdown();
             }
+
 
             Environment.Exit(0);
         }
 
-        public void AddRoom(string location, int capacity, string room_name, string serverURL)
+        public List<Uri> getServers()
         {
             IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), serverURL + "/MeetingServer");
             server.AddRoom(location, capacity, room_name);

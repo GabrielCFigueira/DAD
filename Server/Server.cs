@@ -1,10 +1,12 @@
-﻿using System;
+﻿using Puppet_Server;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Remoting;
 using System.Runtime.Remoting.Channels;
 using System.Runtime.Remoting.Channels.Tcp;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Puppet_Server;
 
@@ -25,7 +27,7 @@ namespace Project
             ChannelServices.RegisterChannel(channel, false);
 
             ServerImpl MeetingServer = new ServerImpl(id,url,maxFaults,minDelay,maxDelay);
-            RemotingServices.Marshal(MeetingServer, "MeetingServer", typeof(ServerImpl));
+            RemotingServices.Marshal(MeetingServer, uri.Segments[1], typeof(ServerImpl));
 
             System.Console.ReadLine();
         }
@@ -173,7 +175,7 @@ namespace Project
             ClientInterface c = (ClientInterface)Activator.GetObject(
                  typeof(ClientInterface),
                  client_URL);
-            c.Connect(this.url + "/MeetingServer");
+            c.Connect(this.url);
             Clients.Add(c);
             Console.WriteLine("Registei o cliente");
 
