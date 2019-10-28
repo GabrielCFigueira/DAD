@@ -1,10 +1,12 @@
-﻿using System;
+﻿using Puppet_Server;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Remoting;
 using System.Runtime.Remoting.Channels;
 using System.Runtime.Remoting.Channels.Tcp;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Project
@@ -30,7 +32,7 @@ namespace Project
         }
     }
 
-    class ServerImpl : MarshalByRefObject, ServerInterface
+    class ServerImpl : MarshalByRefObject, ServerInterface, IPS
     {
         List<ClientInterface> Clients;
         Dictionary<String,Proposal> Proposals;
@@ -173,6 +175,18 @@ namespace Project
             Clients.Add(c);
             Console.WriteLine("Registei o cliente");
 
+        }
+
+        public void shutdown()
+        {
+            Thread thread = new Thread(new ThreadStart(localShutdown));
+            thread.Start();
+        }
+
+        private void localShutdown()
+        {
+            Thread.Sleep(2000);
+            Environment.Exit(0);
         }
     }
 
