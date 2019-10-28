@@ -75,7 +75,7 @@ namespace PuppetMaster
             foreach (Uri serverURL in pmi.getServers())
             {
                 int capacity = Int32.Parse(commands[1]);
-                pmi.AddRoom(commands[0], capacity, commands[2], serverURL);
+                pmi.AddRoom(commands[0], capacity, commands[2], serverURL.AbsoluteUri);
             }
         }
 
@@ -91,9 +91,9 @@ namespace PuppetMaster
 
         private void Status_Click(object sender, EventArgs e)
         {
-            foreach (String serverURL in pmi.getServers())
+            foreach (Uri serverURL in pmi.getServers())
             {
-                pmi.Status(serverURL);
+                pmi.Status(serverURL.AbsoluteUri);
             }
         }
     }
@@ -183,7 +183,7 @@ namespace PuppetMaster
 
             foreach(Uri url in serverList)
             {
-                IPS ips = (IPS)Activator.GetObject(typeof(IPS), url.AbsoluteUri);
+                IServerPuppet ips = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), url.AbsoluteUri);
                 ips.shutdown();
             }
 
@@ -193,9 +193,14 @@ namespace PuppetMaster
 
         public List<Uri> getServers()
         {
-            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), serverURL + "/MeetingServer");
+            
+            return serverList;
+        }
+
+        public void AddRoom(String location, int capacity, String room_name, String url)
+        {
+            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), url);
             server.AddRoom(location, capacity, room_name);
-            throw new NotImplementedException();
         }
 
         public void Crash(string server_id)

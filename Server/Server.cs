@@ -8,7 +8,6 @@ using System.Runtime.Remoting.Channels.Tcp;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Puppet_Server;
 
 namespace Project
 {
@@ -211,6 +210,18 @@ namespace Project
         public void Unfreeze(string server_id)
         {
             throw new NotImplementedException();
+        }
+
+        public void shutdown()
+        {
+            Thread thread = new Thread(new ThreadStart(localShutdown));
+            thread.Start();
+        }
+
+        private void localShutdown()
+        {
+            Thread.Sleep(2000);
+            Environment.Exit(0);
         }
     }
 
