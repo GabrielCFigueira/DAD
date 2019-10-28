@@ -47,7 +47,7 @@ namespace Project
                 MeetingClient.ReadCommands(command);
             }
 
-            System.Console.ReadLine();
+            //System.Console.ReadLine();
 
         }
     }
