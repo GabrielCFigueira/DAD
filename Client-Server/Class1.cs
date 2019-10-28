@@ -14,7 +14,7 @@ namespace Project
 
         void PrintAllMeetings(String meetings);
 
-        void JoinMeeting(String topic, List<String> slots); //n_slots necessary?
+        void JoinMeeting(String topic, List<String> slots);
 
         void CloseMeeting(String topic);
         void Connect(String URL);

@@ -24,7 +24,7 @@ namespace Project
             ChannelServices.RegisterChannel(channel, false);
 
             ServerImpl MeetingServer = new ServerImpl(id,url,maxFaults,minDelay,maxDelay);
-            RemotingServices.Marshal(MeetingServer, "MeetingServer", typeof(ServerImpl));
+            RemotingServices.Marshal(MeetingServer, uri.Segments[1], typeof(ServerImpl));
 
             System.Console.ReadLine();
         }
@@ -169,7 +169,7 @@ namespace Project
             ClientInterface c = (ClientInterface)Activator.GetObject(
                  typeof(ClientInterface),
                  client_URL);
-            c.Connect(this.url + "/MeetingServer");
+            c.Connect(this.url);
             Clients.Add(c);
             Console.WriteLine("Registei o cliente");
 
