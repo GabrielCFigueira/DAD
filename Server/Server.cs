@@ -6,6 +6,7 @@ using System.Runtime.Remoting.Channels;
 using System.Runtime.Remoting.Channels.Tcp;
 using System.Text;
 using System.Threading.Tasks;
+using Puppet_Server;
 
 namespace Project
 {
@@ -30,7 +31,7 @@ namespace Project
         }
     }
 
-    class ServerImpl : MarshalByRefObject, ServerInterface
+    class ServerImpl : MarshalByRefObject, ServerInterface, IServerPuppet
     {
         List<ClientInterface> Clients;
         Dictionary<String,Proposal> Proposals;
@@ -60,6 +61,9 @@ namespace Project
             this.rooms.Add(a);
             this.rooms.Add(b);
             this.rooms.Add(c);
+
+            Location l = new Location("Lisboa", rooms);
+            Meetings.Add(l, new List<Meeting>());
         }
 
         public void CloseMeeting(String topic)
@@ -173,6 +177,38 @@ namespace Project
             Clients.Add(c);
             Console.WriteLine("Registei o cliente");
 
+        }
+
+        public void AddRoom(string location, int capacity, string room_name)
+        {
+            foreach (Location l in Meetings.Keys)
+            {
+                if (l.Local == location)
+                {
+                    Room room = new Room(room_name, capacity);
+                    l.addRoom(room);
+                } 
+            }
+        }
+
+        public void Status()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Crash(string server_id)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Freeze(string server_id)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Unfreeze(string server_id)
+        {
+            throw new NotImplementedException();
         }
     }
 

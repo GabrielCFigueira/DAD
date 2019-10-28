@@ -74,6 +74,8 @@ namespace PuppetMaster
 
             foreach (String serverURL in pmi.getServers())
             {
+                int capacity = Int32.Parse(commands[1]);
+                pmi.AddRoom(commands[0], capacity, commands[2], serverURL);
             }
         }
 
@@ -86,9 +88,17 @@ namespace PuppetMaster
         {
 
         }
+
+        private void Status_Click(object sender, EventArgs e)
+        {
+            foreach (String serverURL in pmi.getServers())
+            {
+                pmi.Status(serverURL);
+            }
+        }
     }
 
-    public class PuppetMasterImp : IPS
+    public class PuppetMasterImp : IPuppet
     {
         private List<string> pcsList;
         private List<string> serverList;
@@ -102,6 +112,11 @@ namespace PuppetMaster
         public void addPCS(string url)
         {
             pcsList.Add(url);
+        }
+
+        public List<string> getServers()
+        {
+            return serverList;
         }
 
         public string readCommand(string command)
@@ -130,6 +145,7 @@ namespace PuppetMaster
                 if (pcsURL.Equals(url.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries)[0]))
                 {
                     IPCS ipcs = (IPCS)Activator.GetObject(typeof(IPCS), "tcp://" + pcsURL + ":10000/PCS");
+                    PastCommand.Text += serverID + url + maxFaults + minDelay + maxDelay;
                     ipcs.createServer(serverID, url, maxFaults, minDelay, maxDelay);
                 }
             }
@@ -146,7 +162,6 @@ namespace PuppetMaster
                     ipcs.createClient(username, url, serverURL, pathScriptFile);
                 }
             }
-            serverList.Add(url);
         }
 
         public void shutdown()
@@ -165,13 +180,10 @@ namespace PuppetMaster
             Environment.Exit(0);
         }
 
-        public List<string> getServers()
+        public void AddRoom(string location, int capacity, string room_name, string serverURL)
         {
-            return serverList;
-        }
-
-        public void AddRoom(string location, int capacity, string room_name)
-        {
+            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), serverURL + "/MeetingServer");
+            server.AddRoom(location, capacity, room_name);
             throw new NotImplementedException();
         }
 
@@ -185,8 +197,10 @@ namespace PuppetMaster
             throw new NotImplementedException();
         }
 
-        public void Status()
+        public void Status(string serverURL)
         {
+            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), serverURL + "/MeetingServer");
+            server.Status();
             throw new NotImplementedException();
         }
 
