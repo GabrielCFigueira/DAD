@@ -34,7 +34,7 @@ namespace Project
 
     class ServerImpl : MarshalByRefObject, ServerInterface, IPS
     {
-        List<ClientInterface> Clients;
+        Dictionary<String,ClientInterface> Clients;
         Dictionary<String,Proposal> Proposals;
         Dictionary<Location,List<Meeting>> Meetings;
         int id;
@@ -53,7 +53,7 @@ namespace Project
             this.maxDelay = maxDelay;
             this.Meetings = new Dictionary<Location, List<Meeting>>();
             this.Proposals = new Dictionary<string, Proposal>();
-            this.Clients = new List<ClientInterface>();
+            this.Clients = new Dictionary<String, ClientInterface>();
 
             //JUST TO TEST,CLEAN AFTER
             Room a = new Room("A", 20);
@@ -96,8 +96,8 @@ namespace Project
             }
 
             Attendee a = new Attendee(userName, Slots);
-            Proposal p;
-            this.Proposals.TryGetValue(topic, out p); //Test this
+            Proposal p = this.Proposals[topic];//check if it is null
+            //this.Proposals.TryGetValue(topic, out p); //Test this
             p.Attendees.Add(a);
 
         }
@@ -160,19 +160,20 @@ namespace Project
                 }
             }
 
-            foreach (ClientInterface c in Clients)
+            foreach (KeyValuePair<String, ClientInterface> entry in Clients)
             {
+                ClientInterface c = entry.Value;
                 c.PrintAllMeetings(message);
             }
         }
 
-        public void Connect(string client_URL)
+        public void Connect(string client_URL, string userName)
         {
             ClientInterface c = (ClientInterface)Activator.GetObject(
                  typeof(ClientInterface),
                  client_URL);
             c.Connect(this.url);
-            Clients.Add(c);
+            Clients.Add(userName,c);
             Console.WriteLine("Registei o cliente");
 
         }
