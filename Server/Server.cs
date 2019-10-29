@@ -182,12 +182,15 @@ namespace Project
 
         public void AddRoom(string location, int capacity, string room_name)
         {
+            Console.WriteLine("Vou adicionar um quarto");
             foreach (Location l in Meetings.Keys)
             {
                 if (l.Local == location)
                 {
                     Room room = new Room(room_name, capacity);
                     l.addRoom(room);
+                    Console.WriteLine("Adicionei um quarto");
+                    Console.WriteLine(l.Local, l.Rooms);
                 } 
             }
         }

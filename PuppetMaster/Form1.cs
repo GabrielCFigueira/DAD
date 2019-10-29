@@ -75,7 +75,7 @@ namespace PuppetMaster
             foreach (Uri serverURL in pmi.getServers())
             {
                 int capacity = Int32.Parse(commands[1]);
-                pmi.AddRoom(commands[0], capacity, commands[2], serverURL.AbsoluteUri);
+                pmi.AddRoom(commands[0], capacity, commands[2], serverURL);
             }
         }
 
@@ -197,9 +197,9 @@ namespace PuppetMaster
             return serverList;
         }
 
-        public void AddRoom(String location, int capacity, String room_name, String url)
+        public void AddRoom(String location, int capacity, String room_name, Uri uri)
         {
-            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), url);
+            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), uri.AbsoluteUri);
             server.AddRoom(location, capacity, room_name);
         }
 

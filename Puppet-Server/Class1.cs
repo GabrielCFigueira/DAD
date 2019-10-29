@@ -12,7 +12,7 @@ namespace Puppet_Server
 
     public interface IPuppet
     {
-        void AddRoom(String location, int capacity, String room_name, String url);
+        void AddRoom(String location, int capacity, String room_name, Uri uri);
 
         void Status(String url);
         void Crash(String server_id);
