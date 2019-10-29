@@ -199,19 +199,6 @@ namespace Project
                 }
             }
             file.Close();
-
-            //just to test
-            /*string test = "";
-            foreach(Location l in Meetings.Keys)
-            {
-                test += "Local: " + l.Local + "\r\nRooms: ";
-                foreach(Room r in l.Rooms)
-                {
-                    test += "Name: " + r.Name + " Capacity: " + r.Capacity + "\r\n";
-                }
-            }
-            Console.WriteLine(test);*/
-
         }
     }
 
