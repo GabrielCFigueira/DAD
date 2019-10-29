@@ -80,8 +80,14 @@ namespace Project
                 Slot slot = new Slot(loc,zone_date[1]);
                 Slots.Add(slot);
             }
-            Proposal m = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, Slots, invitees);
-            Proposals.Add(m.Topic, m);
+            Proposal p = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, Slots, invitees);
+            Proposals.Add(p.Topic, p);
+            foreach(KeyValuePair<String, ClientInterface> entry in Clients)
+            {
+                //Deve ser verificado se o user esta convidado ou nao
+                ClientInterface c = entry.Value;
+                c.AddProposal(p);
+            }
         }
 
         public void JoinMeeting(String topic,String userName, List<String> slots)
@@ -97,6 +103,7 @@ namespace Project
 
             Attendee a = new Attendee(userName, Slots);
             Proposal p = this.Proposals[topic];//check if it is null
+            p.Version += 1;
             //this.Proposals.TryGetValue(topic, out p); //Test this
             p.Attendees.Add(a);
 
@@ -105,6 +112,13 @@ namespace Project
         public void ListMeetings()
         {
             //TODO tirar duvidas com o prof
+
+            foreach (KeyValuePair<String, ClientInterface> entry in Clients)
+            {
+                ClientInterface c = entry.Value;
+                c.UpdateMeetings(this.Proposals,this.Meetings);
+            }
+
             String message = "OPEN MEETINGS\r\n\r\n";
             foreach (KeyValuePair<String, Proposal> entry in Proposals)
             {

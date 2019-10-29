@@ -56,10 +56,12 @@ namespace Project
     {
         String UserName;
         ServerInterface Server;
+        Dictionary<String, AbstractMeeting> meetings;
 
         public ClientImpl(String userName)
         {
             this.UserName = userName;
+            this.meetings = new Dictionary<string, AbstractMeeting>();
         }
 
         public void ReadCommands(String command)
@@ -148,6 +150,46 @@ namespace Project
         public void PrintAllMeetings(string meetings)
         {
             Console.WriteLine(meetings);
+        }
+
+        public void AddProposal(Proposal p)
+        {
+            this.meetings.Add(p.Topic, p);
+        }
+
+        public void UpdateMeetings(Dictionary<string, Proposal> proposals, Dictionary<Location, List<Meeting>> meetings)
+        {
+            foreach(KeyValuePair<String, Proposal> entry in proposals)
+            {
+                //Proposal que veio do servidor
+                Proposal p1 = entry.Value;
+
+                //Respetivo proposal no cliente
+                AbstractMeeting p2;
+                this.meetings.TryGetValue(p1.Topic, out p2);
+                if(p2 != null && p1.Version > p2.Version)
+                {
+                    this.meetings[p1.Topic] = p1;
+                }
+            }
+
+
+            foreach (KeyValuePair<Location, List<Meeting>> entry in meetings)
+            {
+                foreach (Meeting m1 in entry.Value) { 
+
+
+                    //Respetivo meeting no cliente
+                    AbstractMeeting m2;
+                    this.meetings.TryGetValue(m1.Topic, out m2);
+                    if (m2 != null && m1.Version > m2.Version)
+                    {
+                        this.meetings[m1.Topic] = m1;
+                    }
+                }
+            }
+
+            //Print things
         }
     }
 }

@@ -19,6 +19,10 @@ namespace Project
         void CloseMeeting(String topic);
         void Connect(String URL);
 
+        void AddProposal(Proposal p);
+
+        void UpdateMeetings(Dictionary<String, Proposal> proposals, Dictionary<Location, List<Meeting>> meetings);
+
     }
 
     public interface ServerInterface
@@ -35,7 +39,19 @@ namespace Project
     }
 
 
-    public class Meeting
+    public abstract class AbstractMeeting
+    {
+        int version;
+
+        public int Version
+        {
+            get { return version; }
+            set { version = value; }
+        }
+
+        public abstract Boolean isProposal();
+    }
+    public class Meeting:AbstractMeeting
     {
         String coordinator;
         String topic;
@@ -101,7 +117,7 @@ namespace Project
             set { attendees = value; }
         }
 
-        public Meeting(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, Slot slot, List<String> invitees)
+        public Meeting(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, Slot slot, List<String> invitees, int lastVersion)
         {
             this.Coordinator = coordinator;
             this.Topic = topic;
@@ -112,6 +128,12 @@ namespace Project
             this.Invitees = invitees;
             this.isScheduled = false;
             this.Attendees = new List<Attendee>();
+            this.Version = lastVersion + 1;
+        }
+
+        public override Boolean isProposal()
+        {
+            return false;
         }
 
     }
@@ -141,7 +163,7 @@ namespace Project
     }
 
 
-    public class Proposal
+    public class Proposal:AbstractMeeting
     {
         String coordinator;
         String topic;
@@ -210,6 +232,12 @@ namespace Project
             this.Slots = slots;
             this.Invitees = invitees;
             this.Attendees = new List<Attendee>();
+            this.Version = 1;
+        }
+
+        public override Boolean isProposal()
+        {
+            return true;
         }
 
     }
