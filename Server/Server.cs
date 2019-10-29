@@ -119,12 +119,6 @@ namespace Project
                 ClientInterface c = entry.Value;
                 c.UpdateMeetings(this.Proposals,this.Meetings);
             }
-
-            /*foreach (KeyValuePair<String, ClientInterface> entry in Clients)
-            {
-                ClientInterface c = entry.Value;
-                c.PrintAllMeetings(message);
-            }*/
         }
 
         public void Connect(string client_URL, string userName)
