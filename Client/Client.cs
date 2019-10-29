@@ -31,7 +31,7 @@ namespace Project
             ClientImpl MeetingClient = new ClientImpl(userName);
             RemotingServices.Marshal(MeetingClient, clientUri.Segments[1], typeof(ClientImpl));
             ServerInterface server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
-            server.Connect(clientUrl);
+            server.Connect(clientUrl,userName);
 
             string command = "";
             StreamReader file = new StreamReader(scriptFileName);
@@ -47,7 +47,7 @@ namespace Project
                 MeetingClient.ReadCommands(command);
             }
 
-            System.Console.ReadLine();
+            //System.Console.ReadLine();
 
         }
     }

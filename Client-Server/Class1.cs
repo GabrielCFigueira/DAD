@@ -31,7 +31,7 @@ namespace Project
 
         void CloseMeeting(String topic);
 
-        void Connect(String URL);
+        void Connect(String URL,String userName);
     }
 
 
