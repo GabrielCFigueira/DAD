@@ -1,6 +1,7 @@
 ﻿using Puppet_Server;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.Remoting;
 using System.Runtime.Remoting.Channels;
@@ -27,6 +28,8 @@ namespace Project
 
             ServerImpl MeetingServer = new ServerImpl(id,url,maxFaults,minDelay,maxDelay);
             RemotingServices.Marshal(MeetingServer, uri.Segments[1], typeof(ServerImpl));
+
+            InitializeLocationsAndRooms();
 
             System.Console.ReadLine();
         }
@@ -145,6 +148,28 @@ namespace Project
         {
             Thread.Sleep(2000);
             Environment.Exit(0);
+        }
+
+        public void InitializeLocationsAndRooms()
+        {
+            StreamReader file = new StreamReader(@"..\..\ServerConfig\Config.txt");
+            String command = "";
+            while ((command = file.ReadLine()) != null)
+            {
+                string[] commandParams = command.Split(new char[] { ':', ',' }, StringSplitOptions.RemoveEmptyEntries);
+                String location_name = commandParams[0];
+                int counter = Int32.Parse(commandParams[1]);
+                List<Room> rooms = new List<Room>();
+                Location l = new Location(location_name, rooms);
+                for (int i = 2; i < counter + 2; i+=2)
+                {
+                    Room room = new Room(commandParams[i], Int32.Parse(commandParams[i+1]));
+                    l.addRoom(room);
+
+                 }
+            }
+            file.Close();
+
         }
     }
 
