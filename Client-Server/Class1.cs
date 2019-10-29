@@ -50,6 +50,8 @@ namespace Project
         }
 
         public abstract Boolean isProposal();
+
+        public abstract void PrintInfo();
     }
     public class Meeting:AbstractMeeting
     {
@@ -136,6 +138,32 @@ namespace Project
             return false;
         }
 
+        public override void PrintInfo()
+        {
+            String message = "\r\nMEETING\r\n";
+            message += "Coordinator: " + this.Coordinator + "\r\nTopic: " + this.Topic + "\r\nMin_attendees: " + this.Min_attendees + "\r\nN_slots: " + this.N_slots + " \r\nN_invitees: " + this.N_invitees + "\r\nLocal: " + this.Slot.Location;
+            message += "\r\nInvitees: ";
+            foreach (String s in this.Invitees)
+            {
+                message += s + " ";
+            }
+            message += "\r\nState: ";
+            if (this.IsScheduled)
+                message += "SCHEDULED\r\n";
+            if (!this.IsScheduled)
+                message += "CANCELLED\r\n";
+            message += "\r\nAttendees: ";
+            foreach (Attendee a in this.Attendees)
+            {
+                message += a.Name + ", Available Slots: ";
+                foreach (Slot s in a.Available_slots)
+                {
+                    message += s.Location + "," + s.Date + " ";
+                }
+            }
+            message += "\r\n";
+            Console.WriteLine(message);
+        }
     }
 
     public class Attendee
@@ -240,6 +268,31 @@ namespace Project
             return true;
         }
 
+        public override void PrintInfo()
+        {
+            String message = "\r\nPROPOSAL\r\n";
+            message += "Coordinator: " + this.Coordinator + "\r\nTopic: " + this.Topic + "\r\nMin_attendees: " + this.Min_attendees + "\r\nN_slots: " + this.N_slots + " \r\nN_invitees: " + this.N_invitees + "\r\nSlots: ";
+            foreach (Slot s in this.Slots)
+            {
+                message += s.Location + "," + s.Date + " ";
+            }
+            message += "\r\nInvitees: ";
+            foreach (String s in this.Invitees)
+            {
+                message += s + " ";
+            }
+            message += "\r\nAttendees: ";
+            foreach (Attendee a in this.Attendees)
+            {
+                message += a.Name + ", Available Slots: ";
+                foreach (Slot s in a.Available_slots)
+                {
+                    message += s.Location + "," + s.Date + " ";
+                }
+            }
+            message += "\r\n";
+            Console.WriteLine(message);
+        }
     }
 
     public class Room

@@ -111,74 +111,17 @@ namespace Project
 
         public void ListMeetings()
         {
-            //TODO tirar duvidas com o prof
-
             foreach (KeyValuePair<String, ClientInterface> entry in Clients)
             {
                 ClientInterface c = entry.Value;
                 c.UpdateMeetings(this.Proposals,this.Meetings);
             }
 
-            String message = "OPEN MEETINGS\r\n\r\n";
-            foreach (KeyValuePair<String, Proposal> entry in Proposals)
-            {
-                Proposal p = entry.Value;
-                message += "Coordinator: " + p.Coordinator + "\r\nTopic: " + p.Topic + "\r\nMin_attendees: " + p.Min_attendees + "\r\nN_slots: " + p.N_slots + " \r\nN_invitees: " + p.N_invitees + "\r\nSlots: ";
-                foreach(Slot s in p.Slots)
-                {
-                    message += s.Location + "," + s.Date + " ";
-                }
-                message += "\r\nInvitees: ";
-                foreach (String s in p.Invitees)
-                {
-                    message += s + " ";
-                }
-                message += "\r\nAttendees: ";
-                foreach(Attendee a in p.Attendees)
-                {
-                    message += a.Name + ", Available Slots: ";
-                    foreach(Slot s in a.Available_slots)
-                    {
-                        message += s.Location + "," + s.Date + " ";
-                    }
-                }
-                message += "\r\n\r\n\r\nCLOSED MEETINGS\r\n\r\n";
-            }
-
-            foreach (KeyValuePair<Location, List<Meeting>> e in Meetings)
-            {
-                List<Meeting> meet_list = e.Value;
-                foreach (Meeting m in meet_list)
-                {
-                    message += "Coordinator: " + m.Coordinator + "\r\nTopic: " + m.Topic + "\r\nMin_attendees: " + m.Min_attendees + "\r\nN_slots: " + m.N_slots + " \r\nN_invitees: " + m.N_invitees + "\r\nLocal: " + m.Slot.Location;
-                    message += "\r\nInvitees: ";
-                    foreach (String s in m.Invitees)
-                    {
-                        message += s + " ";
-                    }
-                    message += "\r\nState: ";
-                    if (m.IsScheduled)
-                        message += "SCHEDULED\r\n";
-                    if (!m.IsScheduled)
-                        message += "CANCELLED\r\n";
-                    message += "\r\nAttendees: ";
-                    foreach (Attendee a in m.Attendees)
-                    {
-                        message += a.Name + ", Available Slots: ";
-                        foreach (Slot s in a.Available_slots)
-                        {
-                            message += s.Location + "," + s.Date + " ";
-                        }
-                    }
-                    message += "\r\n\r\n\r\n";
-                }
-            }
-
-            foreach (KeyValuePair<String, ClientInterface> entry in Clients)
+            /*foreach (KeyValuePair<String, ClientInterface> entry in Clients)
             {
                 ClientInterface c = entry.Value;
                 c.PrintAllMeetings(message);
-            }
+            }*/
         }
 
         public void Connect(string client_URL, string userName)
