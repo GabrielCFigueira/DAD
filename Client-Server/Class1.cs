@@ -38,7 +38,7 @@ namespace Project
         void Connect(String URL,String userName);
     }
 
-
+    [Serializable()]
     public abstract class AbstractMeeting
     {
         int version;
@@ -53,6 +53,8 @@ namespace Project
 
         public abstract void PrintInfo();
     }
+
+    [Serializable()]
     public class Meeting:AbstractMeeting
     {
         String coordinator;
@@ -161,6 +163,7 @@ namespace Project
         }
     }
 
+    [Serializable()]
     public class Attendee
     {
         String name;
@@ -185,7 +188,7 @@ namespace Project
         }
     }
 
-
+    [Serializable()]
     public class Proposal:AbstractMeeting
     {
         String coordinator;
@@ -301,6 +304,7 @@ namespace Project
         }
     }
 
+    [Serializable()]
     public class Room
     {
         String name;
@@ -325,6 +329,7 @@ namespace Project
         }
     }
 
+    [Serializable()]
     public class Location
     {
         String local;
@@ -354,6 +359,7 @@ namespace Project
         }
     }
 
+    [Serializable()]
     public class Slot
     {
         Location location;
