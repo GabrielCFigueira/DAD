@@ -109,19 +109,10 @@ namespace Project
 
         }
 
-        public void ListMeetings()
+        public void ListMeetings(String userName)
         {
-            foreach (KeyValuePair<String, ClientInterface> entry in Clients)
-            {
-                ClientInterface c = entry.Value;
-                c.UpdateMeetings(this.Proposals,this.Meetings);
-            }
-
-            /*foreach (KeyValuePair<String, ClientInterface> entry in Clients)
-            {
-                ClientInterface c = entry.Value;
-                c.PrintAllMeetings(message);
-            }*/
+            ClientInterface c = this.Clients[userName];
+            c.UpdateMeetings(this.Proposals,this.Meetings);
         }
 
         public void Connect(string client_URL, string userName)

@@ -29,7 +29,7 @@ namespace Project
     {
         void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees);
 
-        void ListMeetings();
+        void ListMeetings(String userName);
 
         void JoinMeeting(String topic, String userName, List<String> slots);
 

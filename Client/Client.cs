@@ -136,7 +136,7 @@ namespace Project
 
         public void ListMeetings()
         {
-            Server.ListMeetings();
+            Server.ListMeetings(this.UserName);
         }
 
         public void Connect(String server_URL)
