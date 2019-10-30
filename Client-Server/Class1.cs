@@ -62,13 +62,19 @@ namespace Project
         int n_invitees;
         Slot slot;
         List<String> invitees;
-        Boolean isScheduled; // True means scheduled, False means cancelled
         List<Attendee> attendees;
+        Room selectedRoom;
 
         public String Coordinator
         {
             get { return coordinator; }
             set { coordinator = value; }
+        }
+
+        public Room SelectedRoom
+        {
+            get { return selectedRoom; }
+            set { selectedRoom = value; }
         }
 
         public String Topic
@@ -107,19 +113,13 @@ namespace Project
             set { invitees = value; }
         }
 
-        public Boolean IsScheduled
-        {
-            get { return isScheduled; }
-            set { isScheduled = value; }
-        }
-
         public List<Attendee> Attendees
         {
             get { return attendees; }
             set { attendees = value; }
         }
 
-        public Meeting(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, Slot slot, List<String> invitees, int lastVersion)
+        public Meeting(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, Slot slot, List<String> invitees, int lastVersion, Room selectedRoom)
         {
             this.Coordinator = coordinator;
             this.Topic = topic;
@@ -128,9 +128,9 @@ namespace Project
             this.N_invitees = n_invitees;
             this.slot = slot;
             this.Invitees = invitees;
-            this.isScheduled = false;
             this.Attendees = new List<Attendee>();
             this.Version = lastVersion + 1;
+            this.SelectedRoom = selectedRoom;
         }
 
         public override Boolean isProposal()
@@ -147,11 +147,6 @@ namespace Project
             {
                 message += s + " ";
             }
-            message += "\r\nState: ";
-            if (this.IsScheduled)
-                message += "SCHEDULED\r\n";
-            if (!this.IsScheduled)
-                message += "CANCELLED\r\n";
             message += "\r\nAttendees: ";
             foreach (Attendee a in this.Attendees)
             {
@@ -198,14 +193,21 @@ namespace Project
         int min_attendees;
         int n_slots;
         int n_invitees;
-        List<Slot> slots;
+        Dictionary<String,Slot> slots;
         List<String> invitees;
         List<Attendee> attendees;
+        Boolean isCancelled;
 
         public String Coordinator
         {
             get { return coordinator; }
             set { coordinator = value; }
+        }
+
+        public Boolean IsCancelled
+        {
+            get { return isCancelled; }
+            set { isCancelled = value; }
         }
 
         public String Topic
@@ -232,7 +234,7 @@ namespace Project
             set { n_invitees = value; }
         }
 
-        public List<Slot> Slots
+        public Dictionary<String,Slot> Slots
         {
             get { return slots; }
             set { slots = value; }
@@ -250,7 +252,7 @@ namespace Project
             set { attendees = value; }
         }
 
-        public Proposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<Slot> slots, List<String> invitees)
+        public Proposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, Dictionary<String,Slot> slots, List<String> invitees)
         {
             this.Coordinator = coordinator;
             this.Topic = topic;
@@ -261,6 +263,7 @@ namespace Project
             this.Invitees = invitees;
             this.Attendees = new List<Attendee>();
             this.Version = 1;
+            this.isCancelled = false;
         }
 
         public override Boolean isProposal()
@@ -272,7 +275,7 @@ namespace Project
         {
             String message = "\r\nPROPOSAL\r\n";
             message += "Coordinator: " + this.Coordinator + "\r\nTopic: " + this.Topic + "\r\nMin_attendees: " + this.Min_attendees + "\r\nN_slots: " + this.N_slots + " \r\nN_invitees: " + this.N_invitees + "\r\nSlots: ";
-            foreach (Slot s in this.Slots)
+            foreach (Slot s in this.Slots.Values)
             {
                 message += s.Location + "," + s.Date + " ";
             }
@@ -280,6 +283,9 @@ namespace Project
             foreach (String s in this.Invitees)
             {
                 message += s + " ";
+            }
+            if (this.IsCancelled) {
+                message += "\r\nState: CANCELLED\r\n";
             }
             message += "\r\nAttendees: ";
             foreach (Attendee a in this.Attendees)
@@ -364,6 +370,12 @@ namespace Project
         {
             get { return date; }
             set { date = value; }
+        }
+
+        public int Votes
+        {
+            get { return votes; }
+            set { votes = value; }
         }
 
         public Slot(Location location, String date)

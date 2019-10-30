@@ -1,0 +1,2 @@
+create Topico 1 1 1 Lisboa,15-05-19 Ze
+list

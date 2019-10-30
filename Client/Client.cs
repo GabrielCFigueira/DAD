@@ -37,6 +37,7 @@ namespace Project
             StreamReader file = new StreamReader(scriptFileName);
             while ((command = file.ReadLine()) != null)
             {
+                Console.WriteLine("tou a ler o ficheiro puto");
                 MeetingClient.ReadCommands(command);
             }
             file.Close();

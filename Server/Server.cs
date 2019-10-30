@@ -54,18 +54,37 @@ namespace Project
             this.minDelay = minDelay;
             this.maxDelay = maxDelay;
             this.Meetings = new Dictionary<Location, List<Meeting>>();
-            this.Proposals = new Dictionary<string, Proposal>();
+            this.Proposals = new Dictionary<String, Proposal>();
             this.Clients = new Dictionary<String, ClientInterface>();
         }
 
         public void CloseMeeting(String topic)
         {
-            throw new NotImplementedException();
+            Proposal p = this.Proposals[topic];
+            foreach(Slot s in p.Slots.Values)
+            {
+                List<Meeting> meetings = this.Meetings[s.Location];
+                foreach(Meeting m in meetings)
+                {
+                    foreach(Room r in s.Location.Rooms)
+                    {
+                        if((m.SelectedRoom != r || m.Slot.Date != s.Date) && s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
+                        {
+                            Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_slots, p.N_invitees, s, p.Invitees, p.Version + 1, r);
+                            this.Meetings[s.Location].Add(meeting);
+                            this.Proposals.Remove(p.Topic);
+
+                            return;
+                        }
+                    }
+                }
+                p.IsCancelled = true;
+            }
         }
 
         public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
         {
-            List<Slot> Slots = new List<Slot>();
+            Dictionary<String,Slot> Slots = new Dictionary<String, Slot>();
             foreach(String s in slots)
             {
                 string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
@@ -74,7 +93,7 @@ namespace Project
                     if(l.Local == zone_date[0])
                     {
                         Slot slot = new Slot(l, zone_date[1]);
-                        Slots.Add(slot);
+                        Slots.Add(s,slot);
                     }
                 }             
             }
@@ -90,6 +109,7 @@ namespace Project
 
         public void JoinMeeting(String topic,String userName, List<String> slots)
         {
+            Proposal p = this.Proposals[topic];//check if it is null
             List<Slot> Slots = new List<Slot>();
             foreach (String s in slots)
             {
@@ -99,26 +119,30 @@ namespace Project
                     if(l.Local == zone_date[0])
                     {
                         Slot slot = new Slot(l, zone_date[1]);
+                        p.Slots[s].Votes += 1; //CHECK THIS
+                        slot.Votes = p.Slots[s].Votes;
                         Slots.Add(slot);
+
                     }
                 }
             }
 
             Attendee a = new Attendee(userName, Slots);
-            Proposal p = this.Proposals[topic];//check if it is null
             p.Version += 1;
             //this.Proposals.TryGetValue(topic, out p); //Test this
             p.Attendees.Add(a);
 
         }
 
-        public void ListMeetings()
+        public void ListMeetings(String userName)
         {
-            foreach (KeyValuePair<String, ClientInterface> entry in Clients)
+            ClientInterface c = this.Clients[userName];
+            c.UpdateMeetings(this.Proposals, this.Meetings);
+            /*foreach (KeyValuePair<String, ClientInterface> entry in Clients)
             {
                 ClientInterface c = entry.Value;
                 c.UpdateMeetings(this.Proposals,this.Meetings);
-            }
+            }*/
         }
 
         public void Connect(string client_URL, string userName)
