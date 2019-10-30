@@ -1,0 +1,2 @@
+Lisboa:2,Room A,20,Room B,10
+Porto:1,Room C,15

@@ -336,6 +336,11 @@ namespace Project
             set { rooms = value; }
         }
 
+        public void addRoom(Room room)
+        {
+            rooms.Add(room);
+        }
+
         public Location(String local, List<Room> rooms)
         {
             this.Local = local;

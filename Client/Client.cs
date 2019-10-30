@@ -80,7 +80,7 @@ namespace Project
                     List<String> meeting_slots = new List<String>();
                     List<String> invitees = new List<String>();
                     for (int i = 5; i < n_slots + 5; i++)
-                    {
+                    {     
                         string slot = commandParams[i];
                         meeting_slots.Add(slot);
                     }
