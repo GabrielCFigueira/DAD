@@ -53,7 +53,7 @@ namespace Project
 
         public abstract void PrintInfo();
     }
-    public class Meeting:AbstractMeeting
+    public class Meeting: AbstractMeeting
     {
         String coordinator;
         String topic;
@@ -186,7 +186,7 @@ namespace Project
     }
 
 
-    public class Proposal:AbstractMeeting
+    public class Proposal: AbstractMeeting
     {
         String coordinator;
         String topic;
