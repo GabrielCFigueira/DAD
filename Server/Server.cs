@@ -58,27 +58,47 @@ namespace Project
             this.Clients = new Dictionary<String, ClientInterface>();
         }
 
-        public void CloseMeeting(String topic)
+        public void CloseMeeting(String userName, String topic)
         {
             Proposal p = this.Proposals[topic];
-            foreach(Slot s in p.Slots.Values)
+            if (p.Coordinator == userName)
             {
-                List<Meeting> meetings = this.Meetings[s.Location];
-                foreach(Meeting m in meetings)
+                Console.WriteLine("coordinator certo");
+                foreach (Slot s in p.Slots.Values)
                 {
-                    foreach(Room r in s.Location.Rooms)
+                    List<Meeting> meetings = this.Meetings[s.Location];
+                    if (meetings.Count != 0)
                     {
-                        if((m.SelectedRoom != r || m.Slot.Date != s.Date) && s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
+                        foreach (Meeting m in meetings)
                         {
-                            Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_slots, p.N_invitees, s, p.Invitees, p.Version + 1, r);
-                            this.Meetings[s.Location].Add(meeting);
-                            this.Proposals.Remove(p.Topic);
+                            foreach (Room r in s.Location.Rooms)
+                            {
+                                if ((m.SelectedRoom != r || m.Slot.Date != s.Date) && s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
+                                {
+                                    Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_slots, p.N_invitees, s, p.Invitees, p.Version + 1, r,p.Attendees);
+                                    this.Meetings[s.Location].Add(meeting);
+                                    this.Proposals.Remove(p.Topic);
 
-                            return;
+                                    return;
+                                }
+                            }
+                        }
+                    } else
+                    {
+                        foreach (Room r in s.Location.Rooms)
+                        {
+                            if (s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
+                            {
+                                Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_slots, p.N_invitees, s, p.Invitees, p.Version + 1, r,p.Attendees);
+                                this.Meetings[s.Location].Add(meeting);
+                                this.Proposals.Remove(p.Topic);
+
+                                return;
+                            }
                         }
                     }
+                    p.IsCancelled = true;
                 }
-                p.IsCancelled = true;
             }
         }
 
@@ -114,7 +134,7 @@ namespace Project
             foreach (String s in slots)
             {
                 string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
-                foreach(Location l in Meetings.Keys)
+                foreach (Location l in Meetings.Keys)
                 {
                     if(l.Local == zone_date[0])
                     {

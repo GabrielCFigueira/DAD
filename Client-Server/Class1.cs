@@ -33,12 +33,12 @@ namespace Project
 
         void JoinMeeting(String topic, String userName, List<String> slots);
 
-        void CloseMeeting(String topic);
+        void CloseMeeting(String userName,String topic);
 
         void Connect(String URL,String userName);
     }
 
-
+    [Serializable]
     public abstract class AbstractMeeting
     {
         int version;
@@ -53,7 +53,9 @@ namespace Project
 
         public abstract void PrintInfo();
     }
-    public class Meeting: AbstractMeeting
+
+    [Serializable]
+    public class Meeting:AbstractMeeting
     {
         String coordinator;
         String topic;
@@ -119,7 +121,7 @@ namespace Project
             set { attendees = value; }
         }
 
-        public Meeting(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, Slot slot, List<String> invitees, int lastVersion, Room selectedRoom)
+        public Meeting(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, Slot slot, List<String> invitees, int lastVersion, Room selectedRoom, List<Attendee> attendees)
         {
             this.Coordinator = coordinator;
             this.Topic = topic;
@@ -131,6 +133,7 @@ namespace Project
             this.Attendees = new List<Attendee>();
             this.Version = lastVersion + 1;
             this.SelectedRoom = selectedRoom;
+            this.Attendees = attendees;
         }
 
         public override Boolean isProposal()
@@ -141,7 +144,7 @@ namespace Project
         public override void PrintInfo()
         {
             String message = "\r\nMEETING\r\n";
-            message += "Coordinator: " + this.Coordinator + "\r\nTopic: " + this.Topic + "\r\nMin_attendees: " + this.Min_attendees + "\r\nN_slots: " + this.N_slots + " \r\nN_invitees: " + this.N_invitees + "\r\nLocal: " + this.Slot.Location;
+            message += "Coordinator: " + this.Coordinator + "\r\nTopic: " + this.Topic + "\r\nMin_attendees: " + this.Min_attendees + "\r\nN_slots: " + this.N_slots + " \r\nN_invitees: " + this.N_invitees + "\r\nLocal: " + this.Slot.Location.Local;
             message += "\r\nInvitees: ";
             foreach (String s in this.Invitees)
             {
@@ -153,7 +156,7 @@ namespace Project
                 message += a.Name + ", Available Slots: ";
                 foreach (Slot s in a.Available_slots)
                 {
-                    message += s.Location + "," + s.Date + " ";
+                    message += s.Location.Local + "," + s.Date + " ";
                 }
             }
             message += "\r\n";
@@ -161,6 +164,7 @@ namespace Project
         }
     }
 
+    [Serializable]
     public class Attendee
     {
         String name;
@@ -185,8 +189,8 @@ namespace Project
         }
     }
 
-
-    public class Proposal: AbstractMeeting
+    [Serializable]
+    public class Proposal:AbstractMeeting
     {
         String coordinator;
         String topic;
@@ -277,7 +281,7 @@ namespace Project
             message += "Coordinator: " + this.Coordinator + "\r\nTopic: " + this.Topic + "\r\nMin_attendees: " + this.Min_attendees + "\r\nN_slots: " + this.N_slots + " \r\nN_invitees: " + this.N_invitees + "\r\nSlots: ";
             foreach (Slot s in this.Slots.Values)
             {
-                message += s.Location + "," + s.Date + " ";
+                message += s.Location.Local + "," + s.Date + " ";
             }
             message += "\r\nInvitees: ";
             foreach (String s in this.Invitees)
@@ -293,7 +297,7 @@ namespace Project
                 message += a.Name + ", Available Slots: ";
                 foreach (Slot s in a.Available_slots)
                 {
-                    message += s.Location + "," + s.Date + " ";
+                    message += s.Location.Local + "," + s.Date + " ";
                 }
             }
             message += "\r\n";
@@ -301,6 +305,7 @@ namespace Project
         }
     }
 
+    [Serializable]
     public class Room
     {
         String name;
@@ -325,6 +330,7 @@ namespace Project
         }
     }
 
+    [Serializable()]
     public class Location
     {
         String local;
@@ -354,6 +360,7 @@ namespace Project
         }
     }
 
+    [Serializable]
     public class Slot
     {
         Location location;

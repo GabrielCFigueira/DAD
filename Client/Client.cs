@@ -37,7 +37,6 @@ namespace Project
             StreamReader file = new StreamReader(scriptFileName);
             while ((command = file.ReadLine()) != null)
             {
-                Console.WriteLine("tou a ler o ficheiro puto");
                 MeetingClient.ReadCommands(command);
             }
             file.Close();
@@ -121,7 +120,7 @@ namespace Project
 
         public void CloseMeeting(String topic)
         {
-            throw new NotImplementedException();
+            Server.CloseMeeting(this.UserName,topic);
         }
 
         public void CreateProposal(String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
@@ -131,7 +130,6 @@ namespace Project
 
         public void JoinMeeting(String topic, List<String> slots)
         {
-
             Server.JoinMeeting(topic, this.UserName, slots);
         }
 
