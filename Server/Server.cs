@@ -84,7 +84,8 @@ namespace Project
                                 }
                             }
                         }
-                    } else
+                    }
+                    else
                     {
                         foreach (Room r in s.Location.Rooms)
                         {
@@ -173,7 +174,9 @@ namespace Project
                 Attendee a = new Attendee(userName, Slots);
                 p.Version += 1;
                 p.Attendees.Add(a);
-            } else {
+            }
+            else
+            {
                 Console.WriteLine("Sou o/a " + userName + " e estou a dar join a um meeting onde nao estou convidado/a");
             }
 

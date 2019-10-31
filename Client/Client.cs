@@ -16,33 +16,40 @@ namespace Project
 
         static void Main(string[] args)
         {
-            String userName = args[1];
-            String clientUrl = args[2];
-            String serverUrl = args[3];
-            String scriptFileName = args[4];
-
-            Uri clientUri = new Uri(clientUrl);
-
-            TcpChannel channel = new TcpChannel(clientUri.Port);
-            ChannelServices.RegisterChannel(channel, false);
-
-            ClientImpl MeetingClient = new ClientImpl(userName);
-            RemotingServices.Marshal(MeetingClient, clientUri.Segments[1], typeof(ClientImpl));
-            ServerInterface server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
-            server.Connect(clientUrl,userName);
-
-            string command = "";
-            StreamReader file = new StreamReader(scriptFileName);
-            while ((command = file.ReadLine()) != null)
+            try
             {
-                MeetingClient.ReadCommands(command);
-            }
-            file.Close();
+                String userName = args[1];
+                String clientUrl = args[2];
+                String serverUrl = args[3];
+                String scriptFileName = args[4];
 
-            while (true)
+                Uri clientUri = new Uri(clientUrl);
+
+                TcpChannel channel = new TcpChannel(clientUri.Port);
+                ChannelServices.RegisterChannel(channel, false);
+
+                ClientImpl MeetingClient = new ClientImpl(userName);
+                RemotingServices.Marshal(MeetingClient, clientUri.Segments[1], typeof(ClientImpl));
+                ServerInterface server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
+                server.Connect(clientUrl, userName);
+
+                string command = "";
+                StreamReader file = new StreamReader(scriptFileName);
+                while ((command = file.ReadLine()) != null)
+                {
+                    MeetingClient.ReadCommands(command);
+                }
+                file.Close();
+
+                while (true)
+                {
+                    command = Console.ReadLine();
+                    MeetingClient.ReadCommands(command);
+                }
+            } catch(Exception e)
             {
-                command = Console.ReadLine();
-                MeetingClient.ReadCommands(command);
+                Console.WriteLine(e);
+                Thread.Sleep(100000);
             }
 
         }
@@ -141,7 +148,7 @@ namespace Project
             Server = (ServerInterface)Activator.GetObject(
                 typeof(ServerInterface),
                 server_URL);
-            Console.WriteLine("Registei o servidor");
+            Console.WriteLine("Registei o servidor. Sou o/a " + this.UserName);
         }
 
         public void PrintAllMeetings(string meetings)
@@ -164,7 +171,7 @@ namespace Project
                 //Respetivo proposal no cliente
                 AbstractMeeting p2;
                 this.Meetings.TryGetValue(p1.Topic, out p2);
-                if((p2 != null && p1.Version > p2.Version) || p2 == null)
+                if((p2 != null && p1.Version > p2.Version))  //  || p2 == null  shouldnt be necessary in the condition
                 {
                     this.Meetings[p1.Topic] = p1;
                 } 
@@ -179,7 +186,7 @@ namespace Project
                     //Respetivo meeting no cliente
                     AbstractMeeting m2;
                     this.Meetings.TryGetValue(m1.Topic, out m2);
-                    if ((m2 != null && m1.Version > m2.Version) || m2 == null)
+                    if ((m2 != null && m1.Version > m2.Version)) //  || m2 == null  shouldnt be necessary in the condition
                     {
                         this.Meetings[m1.Topic] = m1;
                     }

@@ -1,2 +1,4 @@
-join Pokemon 1 Porto,16-05-19
+wait 3000
+join Pokemon 1 Braga,17-05-19
+wait 30000
 list

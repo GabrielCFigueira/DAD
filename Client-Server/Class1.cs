@@ -159,7 +159,7 @@ namespace Project
                     message += s.Location.Local + "," + s.Date + " ";
                 }
             }
-            message += "\r\n";
+            message += "\r\nSelected Room: " + this.SelectedRoom.Name + "\r\n";
             Console.WriteLine(message);
         }
     }
@@ -288,20 +288,25 @@ namespace Project
             {
                 message += s + " ";
             }
-            if (this.IsCancelled) {
-                message += "\r\nState: CANCELLED\r\n";
-            }
-            message += "\r\nAttendees: ";
-            foreach (Attendee a in this.Attendees)
+            if (this.IsCancelled)
             {
-                message += a.Name + ", Available Slots: ";
-                foreach (Slot s in a.Available_slots)
-                {
-                    message += s.Location.Local + "," + s.Date + " ";
-                }
+                message += "\r\nState: CANCELLED\r\n";
+                Console.WriteLine(message);
             }
-            message += "\r\n";
-            Console.WriteLine(message);
+            else
+            {
+                message += "\r\nAttendees: ";
+                foreach (Attendee a in this.Attendees)
+                {
+                    message += a.Name + ", Available Slots: ";
+                    foreach (Slot s in a.Available_slots)
+                    {
+                        message += s.Location.Local + "," + s.Date + " ";
+                    }
+                }
+                message += "\r\n";
+                Console.WriteLine(message);
+            }
         }
     }
 
