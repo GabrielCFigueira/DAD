@@ -191,7 +191,8 @@ namespace Project
                     Room room = new Room(room_name, capacity);
                     l.addRoom(room);
                     Console.WriteLine("Adicionei um quarto");
-                    Console.WriteLine(l.Local, l.Rooms);
+                    Console.WriteLine(l.Local);
+                    Console.WriteLine(l.Rooms);
                 } 
             }
         }
