@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Runtime.Remoting.Channels;
 using System.Runtime.Remoting.Channels.Tcp;
+using System.Threading;
 
 namespace PuppetMaster
 {
@@ -24,20 +25,7 @@ namespace PuppetMaster
         public PuppetMaster()
         {
             InitializeComponent();
-            pmi = new PuppetMasterImp();
-            System.IO.StreamReader file = new System.IO.StreamReader("..\\..\\PCShostnames.txt");
-
-            string line;
-            while ((line = file.ReadLine()) != null)
-            {
-                pmi.addPCS(line);
-            }
-
-            file = new System.IO.StreamReader("..\\..\\Commands.txt");
-            while ((line = file.ReadLine()) != null)
-            {
-                pmi.readCommand(line);
-            }
+            pmi = new PuppetMasterImp("..\\..\\PCShostnames.txt", "..\\..\\Commands.txt");
         }
 
         private void TextBox1_TextChanged(object sender, EventArgs e)
@@ -94,11 +82,30 @@ namespace PuppetMaster
         private List<Uri> serverList;
         private List<Uri> clientList;
 
-        public PuppetMasterImp()
+        delegate void CreateServerDelegate(string s1, string s2, string s3, string s4, string s5);
+        delegate void CreateClientDelegate(string s1, string s2, string s3, string s4);
+
+
+
+        public PuppetMasterImp(string pcsHostnameFile, string commandsFile)
         {
             serverList = new List<Uri>();
             pcsList = new List<Uri>();
             clientList = new List<Uri>();
+
+            System.IO.StreamReader file = new System.IO.StreamReader(pcsHostnameFile);
+
+            string line;
+            while ((line = file.ReadLine()) != null)
+            {
+                addPCS(line);
+            }
+
+            file = new System.IO.StreamReader(commandsFile);
+            while ((line = file.ReadLine()) != null)
+            {
+                readCommand(line);
+            }
         }
 
         public void addPCS(string url)
@@ -122,10 +129,15 @@ namespace PuppetMaster
             switch (commands[0])
             {
                 case "Server":
-                    createServer(commands[1], commands[2], commands[3], commands[4], commands[5]);
+                    CreateServerDelegate serverDelegate = new CreateServerDelegate(createServer);
+                    serverDelegate.BeginInvoke(commands[1], commands[2], commands[3], commands[4], commands[5], null, null);
                     return command;
                 case "Client":
-                    createClient(commands[1], commands[2], commands[3], commands[4]);
+                    CreateClientDelegate clientDelegate = new CreateClientDelegate(createClient);
+                    clientDelegate.BeginInvoke(commands[1], commands[2], commands[3], commands[4], null, null);
+                    return command;
+                case "Wait":
+                    Thread.Sleep(Int32.Parse(commands[1]));
                     return command;
                 case "Shutdown":
                     shutdown();
