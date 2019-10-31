@@ -22,14 +22,15 @@ namespace PuppetMaster
     {
 
         private PuppetMasterImp pmi;
-        
+
+
         public PuppetMaster()
         {
             InitializeComponent();
-            pmi = new PuppetMasterImp(@"..\..\PCShostnames.txt", @"..\..\Commands.txt");
-            //TcpChannel channel = new TcpChannel(10001);
-            //ChannelServices.RegisterChannel(channel, false);
-            //RemotingServices.Marshal(pmi, "PuppetMaster");
+            TcpChannel channel = new TcpChannel(10001);
+            ChannelServices.RegisterChannel(channel, false);
+            pmi = new PuppetMasterImp("..\\..\\PCShostnames.txt", "..\\..\\Commands.txt");
+            RemotingServices.Marshal(pmi, "PuppetMaster", typeof(PuppetMasterImp));
 
         }
 
