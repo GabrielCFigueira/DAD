@@ -1,2 +1,4 @@
 Server 1 tcp://localhost:8081/MeetingServer 1 1 1
-Client boas tcp://localhost:8086/Client tcp://localhost:8081/MeetingServer C:\Users\windows\source\repos\DAD\DAD\Client\ClientScripts\scripts.txt
+Client Maria tcp://localhost:8100/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsMaria.txt
+Client Joao tcp://localhost:8101/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsJoao.txt
+Client Ze tcp://localhost:8102/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsZe.txt

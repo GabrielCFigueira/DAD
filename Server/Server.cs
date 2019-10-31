@@ -1,6 +1,7 @@
 ﻿using Puppet_Server;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.Remoting;
 using System.Runtime.Remoting.Channels;
@@ -28,11 +29,13 @@ namespace Project
             ServerImpl MeetingServer = new ServerImpl(id,url,maxFaults,minDelay,maxDelay);
             RemotingServices.Marshal(MeetingServer, uri.Segments[1], typeof(ServerImpl));
 
-            System.Console.ReadLine();
+            MeetingServer.InitializeLocationsAndRooms();
+
+            Console.ReadLine();
         }
     }
 
-    class ServerImpl : MarshalByRefObject, ServerInterface, IServerPuppet
+    class ServerImpl : MarshalByRefObject, ServerInterface, IPS
     {
         Dictionary<String,ClientInterface> Clients;
         Dictionary<String,Proposal> Proposals;
@@ -42,7 +45,6 @@ namespace Project
         int maxFaults;
         int minDelay;
         int maxDelay;
-        List<Room> rooms = new List<Room>(); //just to test the functions. Clear this after
 
         public ServerImpl(int id, String url, int maxFaults, int minDelay, int maxDelay)
         {
@@ -52,122 +54,134 @@ namespace Project
             this.minDelay = minDelay;
             this.maxDelay = maxDelay;
             this.Meetings = new Dictionary<Location, List<Meeting>>();
-            this.Proposals = new Dictionary<string, Proposal>();
+            this.Proposals = new Dictionary<String, Proposal>();
             this.Clients = new Dictionary<String, ClientInterface>();
-
-            //JUST TO TEST,CLEAN AFTER
-            Room a = new Room("A", 20);
-            Room b = new Room("B", 10);
-            Room c = new Room("C", 30);
-            this.rooms.Add(a);
-            this.rooms.Add(b);
-            this.rooms.Add(c);
-
-            Location l = new Location("Lisboa", rooms);
-            Meetings.Add(l, new List<Meeting>());
         }
 
-        public void CloseMeeting(String topic)
+        public void CloseMeeting(String userName, String topic)
         {
-            throw new NotImplementedException();
+            Proposal p = this.Proposals[topic];
+            Slot chosenSlot = null;
+            Room selectedRoom = null;
+            if (p.Coordinator == userName)
+            {
+                foreach (Slot s in p.Slots.Values)
+                {
+                    List<Meeting> meetings = this.Meetings[s.Location];
+                    if (meetings.Count != 0)
+                    {
+                        foreach (Meeting m in meetings)
+                        {
+                            foreach (Room r in s.Location.Rooms)
+                            {
+                                if ((m.SelectedRoom != r || m.Slot.Date != s.Date) && s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
+                                {
+                                    if (chosenSlot == null || (chosenSlot != null && chosenSlot.Votes < s.Votes))
+                                    {
+                                        chosenSlot = s;
+                                        selectedRoom = r;
+                                    }
+                                }
+                            }
+                        }
+                    } else
+                    {
+                        foreach (Room r in s.Location.Rooms)
+                        {
+                            if (s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
+                            {
+                                if (chosenSlot == null || (chosenSlot != null && chosenSlot.Votes < s.Votes))
+                                {
+                                    chosenSlot = s;
+                                    selectedRoom = r;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (chosenSlot == null)
+                {
+                    p.IsCancelled = true;
+                    p.Version += 1;
+                    return;
+                }
+                Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_slots, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, p.Attendees);
+                this.Meetings[chosenSlot.Location].Add(meeting);
+                this.Proposals.Remove(p.Topic);
+            }
         }
 
         public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
         {
-            List<Slot> Slots = new List<Slot>();
-            //TODO construir Location e Local_Date
+            Dictionary<String,Slot> Slots = new Dictionary<String, Slot>();
             foreach(String s in slots)
             {
                 string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
-                Location loc = new Location(zone_date[0], this.rooms);
-                Slot slot = new Slot(loc,zone_date[1]);
-                Slots.Add(slot);
+                foreach(Location l in Meetings.Keys)
+                {
+                    if(l.Local == zone_date[0])
+                    {
+                        Slot slot = new Slot(l, zone_date[1]);
+                        Slots.Add(s,slot);
+                    }
+                }             
             }
-            Proposal m = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, Slots, invitees);
-            Proposals.Add(m.Topic, m);
+            Proposal p = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, Slots, invitees);
+            Proposals.Add(p.Topic, p);
+            if (n_invitees > 0)
+            {
+                foreach (String s in invitees)
+                {
+                    ClientInterface c = this.Clients[s];
+                    c.AddProposal(p);
+                }
+            }
+            else if (n_invitees == 0)
+            {
+                foreach (KeyValuePair<String, ClientInterface> entry in Clients)
+                {
+                    //Deve ser verificado se o user esta convidado ou nao para ver se mandamos isto ou nao
+                    ClientInterface c = entry.Value;
+                    c.AddProposal(p);
+                }
+            }
         }
 
         public void JoinMeeting(String topic,String userName, List<String> slots)
         {
+            Proposal p = this.Proposals[topic];
             List<Slot> Slots = new List<Slot>();
-            foreach (String s in slots)
+            if ((p.N_invitees != 0 && p.Invitees.Contains(userName)) || p.N_invitees == 0 || p.Coordinator == userName)
             {
-                string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
-                Location loc = new Location(zone_date[0], this.rooms);
-                Slot slot = new Slot(loc, zone_date[1]);
-                Slots.Add(slot);
-            }
+                foreach (String s in slots)
+                {
+                    string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
+                    foreach (Location l in Meetings.Keys)
+                    {
+                        if (l.Local == zone_date[0])
+                        {
+                            Slot slot = new Slot(l, zone_date[1]);
+                            p.Slots[s].Votes += 1;
+                            slot.Votes = p.Slots[s].Votes;
+                            Slots.Add(slot);
 
-            Attendee a = new Attendee(userName, Slots);
-            Proposal p = this.Proposals[topic];//check if it is null
-            //this.Proposals.TryGetValue(topic, out p); //Test this
-            p.Attendees.Add(a);
+                        }
+                    }
+                }
+
+                Attendee a = new Attendee(userName, Slots);
+                p.Version += 1;
+                p.Attendees.Add(a);
+            } else {
+                Console.WriteLine("Sou o/a " + userName + " e estou a dar join a um meeting onde nao estou convidado/a");
+            }
 
         }
 
-        public void ListMeetings()
+        public void ListMeetings(String userName)
         {
-            //TODO tirar duvidas com o prof
-            String message = "OPEN MEETINGS\r\n\r\n";
-            foreach (KeyValuePair<String, Proposal> entry in Proposals)
-            {
-                Proposal p = entry.Value;
-                message += "Coordinator: " + p.Coordinator + "\r\nTopic: " + p.Topic + "\r\nMin_attendees: " + p.Min_attendees + "\r\nN_slots: " + p.N_slots + " \r\nN_invitees: " + p.N_invitees + "\r\nSlots: ";
-                foreach(Slot s in p.Slots)
-                {
-                    message += s.Location + "," + s.Date + " ";
-                }
-                message += "\r\nInvitees: ";
-                foreach (String s in p.Invitees)
-                {
-                    message += s + " ";
-                }
-                message += "\r\nAttendees: ";
-                foreach(Attendee a in p.Attendees)
-                {
-                    message += a.Name + ", Available Slots: ";
-                    foreach(Slot s in a.Available_slots)
-                    {
-                        message += s.Location + "," + s.Date + " ";
-                    }
-                }
-                message += "\r\n\r\n\r\nCLOSED MEETINGS\r\n\r\n";
-            }
-
-            foreach (KeyValuePair<Location, List<Meeting>> e in Meetings)
-            {
-                List<Meeting> meet_list = e.Value;
-                foreach (Meeting m in meet_list)
-                {
-                    message += "Coordinator: " + m.Coordinator + "\r\nTopic: " + m.Topic + "\r\nMin_attendees: " + m.Min_attendees + "\r\nN_slots: " + m.N_slots + " \r\nN_invitees: " + m.N_invitees + "\r\nLocal: " + m.Slot.Location;
-                    message += "\r\nInvitees: ";
-                    foreach (String s in m.Invitees)
-                    {
-                        message += s + " ";
-                    }
-                    message += "\r\nState: ";
-                    if (m.IsScheduled)
-                        message += "SCHEDULED\r\n";
-                    if (!m.IsScheduled)
-                        message += "CANCELLED\r\n";
-                    message += "\r\nAttendees: ";
-                    foreach (Attendee a in m.Attendees)
-                    {
-                        message += a.Name + ", Available Slots: ";
-                        foreach (Slot s in a.Available_slots)
-                        {
-                            message += s.Location + "," + s.Date + " ";
-                        }
-                    }
-                    message += "\r\n\r\n\r\n";
-                }
-            }
-
-            foreach (KeyValuePair<String, ClientInterface> entry in Clients)
-            {
-                ClientInterface c = entry.Value;
-                c.PrintAllMeetings(message);
-            }
+            ClientInterface c = this.Clients[userName];
+            c.UpdateMeetings(this.Proposals, this.Meetings);
         }
 
         public void Connect(string client_URL, string userName)
@@ -181,42 +195,6 @@ namespace Project
 
         }
 
-        public void AddRoom(string location, int capacity, string room_name)
-        {
-            Console.WriteLine("Vou adicionar um quarto");
-            foreach (Location l in Meetings.Keys)
-            {
-                if (l.Local == location)
-                {
-                    Room room = new Room(room_name, capacity);
-                    l.addRoom(room);
-                    Console.WriteLine("Adicionei um quarto");
-                    Console.WriteLine(l.Local);
-                    Console.WriteLine(l.Rooms);
-                } 
-            }
-        }
-
-        public void Status()
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Crash(string server_id)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Freeze(string server_id)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Unfreeze(string server_id)
-        {
-            throw new NotImplementedException();
-        }
-
         public void shutdown()
         {
             Thread thread = new Thread(new ThreadStart(localShutdown));
@@ -227,6 +205,57 @@ namespace Project
         {
             Thread.Sleep(2000);
             Environment.Exit(0);
+        }
+
+
+
+
+        public void AddRoom(string location, int capacity, string room_name)
+        {
+            foreach (Location l in Meetings.Keys)
+            {
+                if (l.Local == location)
+                {
+                    Room room = new Room(room_name, capacity);
+                    l.addRoom(room);
+                }
+            }
+        }
+        public void InitializeLocationsAndRooms()
+        {
+            StreamReader file = new StreamReader(@"..\..\..\Server\ServerConfig\Config.txt");
+            String command = "";
+            Boolean alreadyExists = false;
+            while ((command = file.ReadLine()) != null)
+            {
+                string[] commandParams = command.Split(new char[] { ':', ',' }, StringSplitOptions.RemoveEmptyEntries);
+                String location_name = commandParams[0];
+                int counter = Int32.Parse(commandParams[1]);
+                foreach (Location loc in Meetings.Keys)
+                {
+                    if (loc.Local == location_name)
+                    {
+                        alreadyExists = true;
+                        for (int i = 2; i < counter*2 + 2; i += 2)
+                        {
+                            Room room = new Room(commandParams[i], Int32.Parse(commandParams[i + 1]));
+                            loc.addRoom(room);
+                        }
+                    }
+                }
+                if (!alreadyExists)
+                {
+                    List<Room> rooms = new List<Room>();
+                    Location l = new Location(location_name, rooms);
+                    for (int i = 2; i < counter * 2 + 2; i += 2)
+                    {
+                        Room room = new Room(commandParams[i], Int32.Parse(commandParams[i + 1]));
+                        l.addRoom(room);
+                    }
+                    this.Meetings.Add(l, new List<Meeting>());
+                }
+            }
+            file.Close();
         }
     }
 

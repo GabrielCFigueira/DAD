@@ -19,23 +19,43 @@ namespace Project
         void CloseMeeting(String topic);
         void Connect(String URL);
 
+        void AddProposal(Proposal p);
+
+        void UpdateMeetings(Dictionary<String, Proposal> proposals, Dictionary<Location, List<Meeting>> meetings);
+
     }
 
     public interface ServerInterface
     {
         void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees);
 
-        void ListMeetings();
+        void ListMeetings(String userName);
 
         void JoinMeeting(String topic, String userName, List<String> slots);
 
-        void CloseMeeting(String topic);
+        void CloseMeeting(String userName,String topic);
 
         void Connect(String URL,String userName);
     }
 
+    [Serializable]
+    public abstract class AbstractMeeting
+    {
+        int version;
 
-    public class Meeting
+        public int Version
+        {
+            get { return version; }
+            set { version = value; }
+        }
+
+        public abstract Boolean isProposal();
+
+        public abstract void PrintInfo();
+    }
+
+    [Serializable]
+    public class Meeting:AbstractMeeting
     {
         String coordinator;
         String topic;
@@ -44,13 +64,19 @@ namespace Project
         int n_invitees;
         Slot slot;
         List<String> invitees;
-        Boolean isScheduled; // True means scheduled, False means cancelled
         List<Attendee> attendees;
+        Room selectedRoom;
 
         public String Coordinator
         {
             get { return coordinator; }
             set { coordinator = value; }
+        }
+
+        public Room SelectedRoom
+        {
+            get { return selectedRoom; }
+            set { selectedRoom = value; }
         }
 
         public String Topic
@@ -89,19 +115,13 @@ namespace Project
             set { invitees = value; }
         }
 
-        public Boolean IsScheduled
-        {
-            get { return isScheduled; }
-            set { isScheduled = value; }
-        }
-
         public List<Attendee> Attendees
         {
             get { return attendees; }
             set { attendees = value; }
         }
 
-        public Meeting(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, Slot slot, List<String> invitees)
+        public Meeting(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, Slot slot, List<String> invitees, int lastVersion, Room selectedRoom, List<Attendee> attendees)
         {
             this.Coordinator = coordinator;
             this.Topic = topic;
@@ -110,12 +130,41 @@ namespace Project
             this.N_invitees = n_invitees;
             this.slot = slot;
             this.Invitees = invitees;
-            this.isScheduled = false;
             this.Attendees = new List<Attendee>();
+            this.Version = lastVersion + 1;
+            this.SelectedRoom = selectedRoom;
+            this.Attendees = attendees;
         }
 
+        public override Boolean isProposal()
+        {
+            return false;
+        }
+
+        public override void PrintInfo()
+        {
+            String message = "\r\nMEETING\r\n";
+            message += "Coordinator: " + this.Coordinator + "\r\nTopic: " + this.Topic + "\r\nMin_attendees: " + this.Min_attendees + "\r\nN_slots: " + this.N_slots + " \r\nN_invitees: " + this.N_invitees + "\r\nLocal: " + this.Slot.Location.Local;
+            message += "\r\nInvitees: ";
+            foreach (String s in this.Invitees)
+            {
+                message += s + " ";
+            }
+            message += "\r\nAttendees: ";
+            foreach (Attendee a in this.Attendees)
+            {
+                message += a.Name + ", Available Slots: ";
+                foreach (Slot s in a.Available_slots)
+                {
+                    message += s.Location.Local + "," + s.Date + " ";
+                }
+            }
+            message += "\r\n";
+            Console.WriteLine(message);
+        }
     }
 
+    [Serializable]
     public class Attendee
     {
         String name;
@@ -140,22 +189,29 @@ namespace Project
         }
     }
 
-
-    public class Proposal
+    [Serializable]
+    public class Proposal:AbstractMeeting
     {
         String coordinator;
         String topic;
         int min_attendees;
         int n_slots;
         int n_invitees;
-        List<Slot> slots;
+        Dictionary<String,Slot> slots;
         List<String> invitees;
         List<Attendee> attendees;
+        Boolean isCancelled;
 
         public String Coordinator
         {
             get { return coordinator; }
             set { coordinator = value; }
+        }
+
+        public Boolean IsCancelled
+        {
+            get { return isCancelled; }
+            set { isCancelled = value; }
         }
 
         public String Topic
@@ -182,7 +238,7 @@ namespace Project
             set { n_invitees = value; }
         }
 
-        public List<Slot> Slots
+        public Dictionary<String,Slot> Slots
         {
             get { return slots; }
             set { slots = value; }
@@ -200,7 +256,7 @@ namespace Project
             set { attendees = value; }
         }
 
-        public Proposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<Slot> slots, List<String> invitees)
+        public Proposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, Dictionary<String,Slot> slots, List<String> invitees)
         {
             this.Coordinator = coordinator;
             this.Topic = topic;
@@ -210,10 +266,46 @@ namespace Project
             this.Slots = slots;
             this.Invitees = invitees;
             this.Attendees = new List<Attendee>();
+            this.Version = 1;
+            this.isCancelled = false;
         }
 
+        public override Boolean isProposal()
+        {
+            return true;
+        }
+
+        public override void PrintInfo()
+        {
+            String message = "\r\nPROPOSAL\r\n";
+            message += "Coordinator: " + this.Coordinator + "\r\nTopic: " + this.Topic + "\r\nMin_attendees: " + this.Min_attendees + "\r\nN_slots: " + this.N_slots + " \r\nN_invitees: " + this.N_invitees + "\r\nSlots: ";
+            foreach (Slot s in this.Slots.Values)
+            {
+                message += s.Location.Local + "," + s.Date + " ";
+            }
+            message += "\r\nInvitees: ";
+            foreach (String s in this.Invitees)
+            {
+                message += s + " ";
+            }
+            if (this.IsCancelled) {
+                message += "\r\nState: CANCELLED\r\n";
+            }
+            message += "\r\nAttendees: ";
+            foreach (Attendee a in this.Attendees)
+            {
+                message += a.Name + ", Available Slots: ";
+                foreach (Slot s in a.Available_slots)
+                {
+                    message += s.Location.Local + "," + s.Date + " ";
+                }
+            }
+            message += "\r\n";
+            Console.WriteLine(message);
+        }
     }
 
+    [Serializable]
     public class Room
     {
         String name;
@@ -238,6 +330,7 @@ namespace Project
         }
     }
 
+    [Serializable()]
     public class Location
     {
         String local;
@@ -259,6 +352,7 @@ namespace Project
         {
             rooms.Add(room);
         }
+
         public Location(String local, List<Room> rooms)
         {
             this.Local = local;
@@ -266,6 +360,7 @@ namespace Project
         }
     }
 
+    [Serializable]
     public class Slot
     {
         Location location;
@@ -282,6 +377,12 @@ namespace Project
         {
             get { return date; }
             set { date = value; }
+        }
+
+        public int Votes
+        {
+            get { return votes; }
+            set { votes = value; }
         }
 
         public Slot(Location location, String date)

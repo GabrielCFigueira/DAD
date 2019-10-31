@@ -1,0 +1,2 @@
+join Pokemon 1 Lisboa,15-05-19
+list

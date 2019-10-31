@@ -22,8 +22,6 @@ namespace Project
             String scriptFileName = args[4];
 
             Uri clientUri = new Uri(clientUrl);
-            //string[] clientURL_parts = clientUrl.Split(new char[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
-            //string remoteObjectName = clientURL_parts[clientURL_parts.Length - 1];  
 
             TcpChannel channel = new TcpChannel(clientUri.Port);
             ChannelServices.RegisterChannel(channel, false);
@@ -47,8 +45,6 @@ namespace Project
                 MeetingClient.ReadCommands(command);
             }
 
-            //System.Console.ReadLine();
-
         }
     }
 
@@ -56,10 +52,12 @@ namespace Project
     {
         String UserName;
         ServerInterface Server;
+        Dictionary<String, AbstractMeeting> Meetings;
 
         public ClientImpl(String userName)
         {
             this.UserName = userName;
+            this.Meetings = new Dictionary<string, AbstractMeeting>();
         }
 
         public void ReadCommands(String command)
@@ -78,7 +76,7 @@ namespace Project
                     List<String> meeting_slots = new List<String>();
                     List<String> invitees = new List<String>();
                     for (int i = 5; i < n_slots + 5; i++)
-                    {
+                    {     
                         string slot = commandParams[i];
                         meeting_slots.Add(slot);
                     }
@@ -118,7 +116,7 @@ namespace Project
 
         public void CloseMeeting(String topic)
         {
-            throw new NotImplementedException();
+            Server.CloseMeeting(this.UserName,topic);
         }
 
         public void CreateProposal(String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
@@ -128,13 +126,12 @@ namespace Project
 
         public void JoinMeeting(String topic, List<String> slots)
         {
-
             Server.JoinMeeting(topic, this.UserName, slots);
         }
 
         public void ListMeetings()
         {
-            Server.ListMeetings();
+            Server.ListMeetings(this.UserName);
         }
 
         public void Connect(String server_URL)
@@ -148,6 +145,50 @@ namespace Project
         public void PrintAllMeetings(string meetings)
         {
             Console.WriteLine(meetings);
+        }
+
+        public void AddProposal(Proposal p)
+        {
+            this.Meetings.Add(p.Topic, p);
+        }
+
+        public void UpdateMeetings(Dictionary<string, Proposal> proposals, Dictionary<Location, List<Meeting>> meetings)
+        {
+            foreach(KeyValuePair<String, Proposal> entry in proposals)
+            {
+                //Proposal que veio do servidor
+                Proposal p1 = entry.Value;
+
+                //Respetivo proposal no cliente
+                AbstractMeeting p2;
+                this.Meetings.TryGetValue(p1.Topic, out p2);
+                if((p2 != null && p1.Version > p2.Version) || p2 == null)
+                {
+                    this.Meetings[p1.Topic] = p1;
+                } 
+            }
+
+
+            foreach (KeyValuePair<Location, List<Meeting>> entry in meetings)
+            {
+                foreach (Meeting m1 in entry.Value) { 
+
+
+                    //Respetivo meeting no cliente
+                    AbstractMeeting m2;
+                    this.Meetings.TryGetValue(m1.Topic, out m2);
+                    if ((m2 != null && m1.Version > m2.Version) || m2 == null)
+                    {
+                        this.Meetings[m1.Topic] = m1;
+                    }
+                }
+            }
+
+            foreach (KeyValuePair<String, AbstractMeeting> entry in Meetings)
+            {
+                AbstractMeeting m = entry.Value;
+                m.PrintInfo();
+            }
         }
     }
 }
