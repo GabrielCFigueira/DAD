@@ -58,6 +58,11 @@ namespace Project
             this.Clients = new Dictionary<String, ClientInterface>();
         }
 
+        public override object InitializeLifetimeService()
+        {
+            return null;
+        }
+
         public void CloseMeeting(String userName, String topic)
         {
             Proposal p = this.Proposals[topic];

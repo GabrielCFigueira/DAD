@@ -67,6 +67,11 @@ namespace Project
             this.Meetings = new Dictionary<string, AbstractMeeting>();
         }
 
+        public override object InitializeLifetimeService()
+        {
+            return null;
+        }
+
         public void ReadCommands(String command)
         {
             string[] commandParams = command.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
