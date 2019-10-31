@@ -21,7 +21,8 @@ namespace PCS
         {
             TcpChannel channel = new TcpChannel(10000);
             ChannelServices.RegisterChannel(channel, false);
-            RemotingConfiguration.RegisterWellKnownServiceType(typeof(PCSImpl), "PCS", WellKnownObjectMode.Singleton);
+            PCSImpl pcs = new PCSImpl();
+            RemotingServices.Marshal(pcs, "PCS", typeof(PCSImpl));
             Console.WriteLine("<enter> to quit...");
 
             Console.ReadLine();
