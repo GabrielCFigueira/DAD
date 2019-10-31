@@ -22,8 +22,6 @@ namespace Project
             String scriptFileName = args[4];
 
             Uri clientUri = new Uri(clientUrl);
-            //string[] clientURL_parts = clientUrl.Split(new char[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
-            //string remoteObjectName = clientURL_parts[clientURL_parts.Length - 1];  
 
             TcpChannel channel = new TcpChannel(clientUri.Port);
             ChannelServices.RegisterChannel(channel, false);
@@ -46,8 +44,6 @@ namespace Project
                 command = Console.ReadLine();
                 MeetingClient.ReadCommands(command);
             }
-
-            //System.Console.ReadLine();
 
         }
     }
@@ -166,10 +162,10 @@ namespace Project
                 //Respetivo proposal no cliente
                 AbstractMeeting p2;
                 this.Meetings.TryGetValue(p1.Topic, out p2);
-                if(p2 != null && p1.Version > p2.Version)
+                if((p2 != null && p1.Version > p2.Version) || p2 == null)
                 {
                     this.Meetings[p1.Topic] = p1;
-                }
+                } 
             }
 
 
@@ -181,7 +177,7 @@ namespace Project
                     //Respetivo meeting no cliente
                     AbstractMeeting m2;
                     this.Meetings.TryGetValue(m1.Topic, out m2);
-                    if (m2 != null && m1.Version > m2.Version)
+                    if ((m2 != null && m1.Version > m2.Version) || m2 == null)
                     {
                         this.Meetings[m1.Topic] = m1;
                     }

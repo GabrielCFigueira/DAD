@@ -1,6 +1,0 @@
-create Topico 1 2 0 Lisboa,15-05-19 Porto,16-05-19
-list
-join Topico 1 Porto,16-05-19
-list
-close Topico
-list

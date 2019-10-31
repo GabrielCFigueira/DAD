@@ -1,0 +1,8 @@
+create Pokemon 1 2 1 Lisboa,15-05-19 Porto,16-05-19 Joao
+list
+wait 3000
+join Pokemon 1 Porto,16-05-19
+list
+wait 3000
+close Pokemon
+list

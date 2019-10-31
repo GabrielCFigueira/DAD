@@ -61,9 +61,10 @@ namespace Project
         public void CloseMeeting(String userName, String topic)
         {
             Proposal p = this.Proposals[topic];
+            Slot chosenSlot = null;
+            Room selectedRoom = null;
             if (p.Coordinator == userName)
             {
-                Console.WriteLine("coordinator certo");
                 foreach (Slot s in p.Slots.Values)
                 {
                     List<Meeting> meetings = this.Meetings[s.Location];
@@ -75,11 +76,11 @@ namespace Project
                             {
                                 if ((m.SelectedRoom != r || m.Slot.Date != s.Date) && s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
                                 {
-                                    Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_slots, p.N_invitees, s, p.Invitees, p.Version + 1, r,p.Attendees);
-                                    this.Meetings[s.Location].Add(meeting);
-                                    this.Proposals.Remove(p.Topic);
-
-                                    return;
+                                    if (chosenSlot == null || (chosenSlot != null && chosenSlot.Votes < s.Votes))
+                                    {
+                                        chosenSlot = s;
+                                        selectedRoom = r;
+                                    }
                                 }
                             }
                         }
@@ -89,16 +90,24 @@ namespace Project
                         {
                             if (s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
                             {
-                                Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_slots, p.N_invitees, s, p.Invitees, p.Version + 1, r,p.Attendees);
-                                this.Meetings[s.Location].Add(meeting);
-                                this.Proposals.Remove(p.Topic);
-
-                                return;
+                                if (chosenSlot == null || (chosenSlot != null && chosenSlot.Votes < s.Votes))
+                                {
+                                    chosenSlot = s;
+                                    selectedRoom = r;
+                                }
                             }
                         }
                     }
-                    p.IsCancelled = true;
                 }
+                if (chosenSlot == null)
+                {
+                    p.IsCancelled = true;
+                    p.Version += 1;
+                    return;
+                }
+                Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_slots, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, p.Attendees);
+                this.Meetings[chosenSlot.Location].Add(meeting);
+                this.Proposals.Remove(p.Topic);
             }
         }
 
@@ -119,38 +128,53 @@ namespace Project
             }
             Proposal p = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, Slots, invitees);
             Proposals.Add(p.Topic, p);
-            foreach(KeyValuePair<String, ClientInterface> entry in Clients)
+            if (n_invitees > 0)
             {
-                //Deve ser verificado se o user esta convidado ou nao
-                ClientInterface c = entry.Value;
-                c.AddProposal(p);
+                foreach (String s in invitees)
+                {
+                    ClientInterface c = this.Clients[s];
+                    c.AddProposal(p);
+                }
+            }
+            else if (n_invitees == 0)
+            {
+                foreach (KeyValuePair<String, ClientInterface> entry in Clients)
+                {
+                    //Deve ser verificado se o user esta convidado ou nao para ver se mandamos isto ou nao
+                    ClientInterface c = entry.Value;
+                    c.AddProposal(p);
+                }
             }
         }
 
         public void JoinMeeting(String topic,String userName, List<String> slots)
         {
-            Proposal p = this.Proposals[topic];//check if it is null
+            Proposal p = this.Proposals[topic];
             List<Slot> Slots = new List<Slot>();
-            foreach (String s in slots)
+            if ((p.N_invitees != 0 && p.Invitees.Contains(userName)) || p.N_invitees == 0 || p.Coordinator == userName)
             {
-                string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
-                foreach (Location l in Meetings.Keys)
+                foreach (String s in slots)
                 {
-                    if(l.Local == zone_date[0])
+                    string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
+                    foreach (Location l in Meetings.Keys)
                     {
-                        Slot slot = new Slot(l, zone_date[1]);
-                        p.Slots[s].Votes += 1; //CHECK THIS
-                        slot.Votes = p.Slots[s].Votes;
-                        Slots.Add(slot);
+                        if (l.Local == zone_date[0])
+                        {
+                            Slot slot = new Slot(l, zone_date[1]);
+                            p.Slots[s].Votes += 1;
+                            slot.Votes = p.Slots[s].Votes;
+                            Slots.Add(slot);
 
+                        }
                     }
                 }
-            }
 
-            Attendee a = new Attendee(userName, Slots);
-            p.Version += 1;
-            //this.Proposals.TryGetValue(topic, out p); //Test this
-            p.Attendees.Add(a);
+                Attendee a = new Attendee(userName, Slots);
+                p.Version += 1;
+                p.Attendees.Add(a);
+            } else {
+                Console.WriteLine("Sou o/a " + userName + " e estou a dar join a um meeting onde nao estou convidado/a");
+            }
 
         }
 
@@ -158,11 +182,6 @@ namespace Project
         {
             ClientInterface c = this.Clients[userName];
             c.UpdateMeetings(this.Proposals, this.Meetings);
-            /*foreach (KeyValuePair<String, ClientInterface> entry in Clients)
-            {
-                ClientInterface c = entry.Value;
-                c.UpdateMeetings(this.Proposals,this.Meetings);
-            }*/
         }
 
         public void Connect(string client_URL, string userName)
