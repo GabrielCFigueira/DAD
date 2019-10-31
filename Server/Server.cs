@@ -135,6 +135,7 @@ namespace Project
                     ClientInterface c = this.Clients[s];
                     c.AddProposal(p);
                 }
+                this.Clients[coordinator].AddProposal(p);
             }
             else if (n_invitees == 0)
             {
