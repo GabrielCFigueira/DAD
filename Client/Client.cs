@@ -63,6 +63,8 @@ namespace Project
         public void ReadCommands(String command)
         {
             string[] commandParams = command.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            if (commandParams.Length == 0)
+                return;
             switch (commandParams[0])
             {
                 case "list":
