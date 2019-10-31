@@ -14,6 +14,7 @@ using System.Windows.Forms;
 using System.Runtime.Remoting.Channels;
 using System.Runtime.Remoting.Channels.Tcp;
 using System.Threading;
+using System.Runtime.Remoting;
 
 namespace PuppetMaster
 {
@@ -25,7 +26,11 @@ namespace PuppetMaster
         public PuppetMaster()
         {
             InitializeComponent();
-            pmi = new PuppetMasterImp("..\\..\\PCShostnames.txt", "..\\..\\Commands.txt");
+            pmi = new PuppetMasterImp(@"..\..\PCShostnames.txt", @"..\..\Commands.txt");
+            //TcpChannel channel = new TcpChannel(10001);
+            //ChannelServices.RegisterChannel(channel, false);
+            //RemotingServices.Marshal(pmi, "PuppetMaster");
+
         }
 
         private void TextBox1_TextChanged(object sender, EventArgs e)
@@ -76,7 +81,7 @@ namespace PuppetMaster
         }
     }
 
-    public class PuppetMasterImp : IPS
+    public class PuppetMasterImp : MarshalByRefObject, IPS
     {
         private List<Uri> pcsList;
         private List<Uri> serverList;
