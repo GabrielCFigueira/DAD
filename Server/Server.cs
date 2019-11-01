@@ -68,6 +68,7 @@ namespace Project
             Proposal p = this.Proposals[topic];
             Slot chosenSlot = null;
             Room selectedRoom = null;
+            double efficiency = 0;
             if (p.Coordinator == userName)
             {
                 foreach (Slot s in p.Slots.Values)
@@ -81,10 +82,12 @@ namespace Project
                             {
                                 if ((m.SelectedRoom != r || m.Slot.Date != s.Date) && s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
                                 {
-                                    if (chosenSlot == null || (chosenSlot != null && chosenSlot.Votes < s.Votes))
+                                    double tempEfficiency = (double)s.Votes / r.Capacity;
+                                    if ((chosenSlot == null || (chosenSlot != null && chosenSlot.Votes <= s.Votes)) && tempEfficiency > efficiency)
                                     {
-                                        chosenSlot = s;
-                                        selectedRoom = r;
+                                            chosenSlot = s;
+                                            selectedRoom = r;
+                                            efficiency = tempEfficiency;
                                     }
                                 }
                             }
@@ -96,10 +99,12 @@ namespace Project
                         {
                             if (s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
                             {
-                                if (chosenSlot == null || (chosenSlot != null && chosenSlot.Votes < s.Votes))
+                                double tempEfficiency = (double) s.Votes / r.Capacity;
+                                if ((chosenSlot == null || (chosenSlot != null && chosenSlot.Votes <= s.Votes)) && tempEfficiency > efficiency)
                                 {
-                                    chosenSlot = s;
-                                    selectedRoom = r;
+                                        chosenSlot = s;
+                                        selectedRoom = r;
+                                        efficiency = tempEfficiency;
                                 }
                             }
                         }
