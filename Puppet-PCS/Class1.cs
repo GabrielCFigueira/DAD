@@ -8,7 +8,7 @@ namespace Puppet_PCS
 {
     public interface IPCS
     {
-        void createServer(string serverID, string url, string maxFaults, string minDelay, string maxDelay);
+        void createServer(string serverID, string url, string maxFaults, string minDelay, string maxDelay, string puppetURL);
 
         void createClient(string username, string url, string serverURL, string pathScriptFile);
 

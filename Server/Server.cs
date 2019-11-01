@@ -22,11 +22,13 @@ namespace Project
             int minDelay = Int32.Parse(args[4]);
             int maxDelay = Int32.Parse(args[5]);
 
+            String puppetURL = args[6]; // O server precisa de ter o url do puppet (Martelado)
+
             Uri uri = new Uri(url);
             TcpChannel channel = new TcpChannel(uri.Port);
             ChannelServices.RegisterChannel(channel, false);
 
-            ServerImpl MeetingServer = new ServerImpl(id,url,maxFaults,minDelay,maxDelay);
+            ServerImpl MeetingServer = new ServerImpl(id,url,maxFaults,minDelay,maxDelay, puppetURL);
             RemotingServices.Marshal(MeetingServer, uri.Segments[1], typeof(ServerImpl));
 
             MeetingServer.InitializeLocationsAndRooms();
@@ -46,7 +48,9 @@ namespace Project
         int minDelay;
         int maxDelay;
 
-        public ServerImpl(int id, String url, int maxFaults, int minDelay, int maxDelay)
+        String puppetURL;
+
+        public ServerImpl(int id, String url, int maxFaults, int minDelay, int maxDelay, String puppetURL)
         {
             this.id = id;
             this.url = url;
@@ -56,6 +60,8 @@ namespace Project
             this.Meetings = new Dictionary<Location, List<Meeting>>();
             this.Proposals = new Dictionary<String, Proposal>();
             this.Clients = new Dictionary<String, ClientInterface>();
+
+            this.puppetURL = puppetURL;
         }
 
         public void CloseMeeting(String userName, String topic)
@@ -262,7 +268,10 @@ namespace Project
 
         public void Status()
         {
-
+            //string status = "Ola";
+            IPuppet puppet = (IPuppet)Activator.GetObject(typeof(IPuppet), puppetURL);
+            Console.WriteLine("Mandei um status de ola");
+            puppet.Status("OLA");
             throw new NotImplementedException();
         }
 

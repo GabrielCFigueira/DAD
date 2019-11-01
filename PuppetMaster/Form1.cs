@@ -29,7 +29,7 @@ namespace PuppetMaster
             InitializeComponent();
             TcpChannel channel = new TcpChannel(10001);
             ChannelServices.RegisterChannel(channel, false);
-            pmi = new PuppetMasterImp("..\\..\\PCShostnames.txt", "..\\..\\Commands.txt");
+            pmi = new PuppetMasterImp("..\\..\\PCShostnames.txt", "..\\..\\Commands.txt", PastCommand);
             RemotingServices.Marshal(pmi, "PuppetMaster", typeof(PuppetMasterImp));
 
         }
@@ -68,8 +68,13 @@ namespace PuppetMaster
 
             foreach (Uri serverURL in pmi.getServers())
             {
+                // Testar isto outra vez
                 int capacity = Int32.Parse(commands[1]);
-                pmi.AddRoom(commands[0], capacity, commands[2], serverURL);
+                string location = commands[0];
+                string room_name = commands[2];
+
+                IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), serverURL.AbsoluteUri);
+                server.AddRoom(location, capacity, room_name);
             }
         }
 
@@ -87,7 +92,8 @@ namespace PuppetMaster
         {
             foreach (Uri serverURL in pmi.getServers())
             {
-                pmi.Status(serverURL.AbsoluteUri);
+                IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), serverURL.AbsoluteUri);
+                server.Status();
             }
         }
     }
@@ -98,16 +104,20 @@ namespace PuppetMaster
         private List<Uri> serverList;
         private List<Uri> clientList;
 
-        delegate void CreateServerDelegate(string s1, string s2, string s3, string s4, string s5);
+        private TextBox pastCommand;
+
+        delegate void CreateServerDelegate(string s1, string s2, string s3, string s4, string s5, string s6);
         delegate void CreateClientDelegate(string s1, string s2, string s3, string s4);
 
 
 
-        public PuppetMasterImp(string pcsHostnameFile, string commandsFile)
+        public PuppetMasterImp(string pcsHostnameFile, string commandsFile, TextBox PastCommand)
         {
             serverList = new List<Uri>();
             pcsList = new List<Uri>();
             clientList = new List<Uri>();
+
+            pastCommand = PastCommand;
 
             System.IO.StreamReader file = new System.IO.StreamReader(pcsHostnameFile);
 
@@ -146,7 +156,7 @@ namespace PuppetMaster
             {
                 case "Server":
                     CreateServerDelegate serverDelegate = new CreateServerDelegate(createServer);
-                    serverDelegate.BeginInvoke(commands[1], commands[2], commands[3], commands[4], commands[5], null, null);
+                    serverDelegate.BeginInvoke(commands[1], commands[2], commands[3], commands[4], commands[5], "tcp://localhost:10001/PuppetMaster", null, null);
                     return command;
                 case "Client":
                     CreateClientDelegate clientDelegate = new CreateClientDelegate(createClient);
@@ -163,14 +173,14 @@ namespace PuppetMaster
             }
         }
 
-        public void createServer(string serverID, string url, string maxFaults, string minDelay, string maxDelay)
+        public void createServer(string serverID, string url, string maxFaults, string minDelay, string maxDelay, string puppetURL)
         {
             foreach (Uri pcsURL in pcsList)
             {
                 if (pcsURL.Host == (new Uri(url)).Host)
                 {
                     IPCS ipcs = (IPCS)Activator.GetObject(typeof(IPCS), pcsURL.AbsoluteUri);
-                    ipcs.createServer(serverID, url, maxFaults, minDelay, maxDelay);
+                    ipcs.createServer(serverID, url, maxFaults, minDelay, maxDelay, puppetURL);
                     break;
                 }
             }
@@ -215,10 +225,15 @@ namespace PuppetMaster
             return serverList;
         }
 
+        //Se calhar nao preciso disto para a interface do Puppet
         public void AddRoom(String location, int capacity, String room_name, Uri uri)
         {
-            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), uri.AbsoluteUri);
-            server.AddRoom(location, capacity, room_name);
+            throw new NotImplementedException();
+        }
+        public void Status(string status)
+        {
+            pastCommand.Text += status + "\"\r\n";
+            throw new NotImplementedException();
         }
 
         public void Crash(string server_id)
@@ -228,13 +243,6 @@ namespace PuppetMaster
 
         public void Freeze(string server_id)
         {
-            throw new NotImplementedException();
-        }
-
-        public void Status(string serverURL)
-        {
-            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), serverURL + "/MeetingServer");
-            server.Status();
             throw new NotImplementedException();
         }
 
