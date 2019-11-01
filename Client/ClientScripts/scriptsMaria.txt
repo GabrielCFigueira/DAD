@@ -1,3 +1,4 @@
+wait 500
 create Pokemon 1 2 1 Lisboa,15-05-19 Porto,16-05-19 Joao
 list
 wait 3000

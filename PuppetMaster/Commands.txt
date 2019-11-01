@@ -1,5 +1,4 @@
 Server 1 tcp://localhost:8081/MeetingServer 1 1 1
 Client Maria tcp://localhost:8100/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsMaria.txt
-Wait 1000
 Client Joao tcp://localhost:8101/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsJoao.txt
 Client Ze tcp://localhost:8102/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsZe.txt

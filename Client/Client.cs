@@ -16,33 +16,45 @@ namespace Project
 
         static void Main(string[] args)
         {
-            String userName = args[1];
-            String clientUrl = args[2];
-            String serverUrl = args[3];
-            String scriptFileName = args[4];
+            try { 
 
-            Uri clientUri = new Uri(clientUrl);
 
-            TcpChannel channel = new TcpChannel(clientUri.Port);
-            ChannelServices.RegisterChannel(channel, false);
+                String userName = args[1];
+                String clientUrl = args[2];
+                String serverUrl = args[3];
+                String scriptFileName = args[4];
 
-            ClientImpl MeetingClient = new ClientImpl(userName);
-            RemotingServices.Marshal(MeetingClient, clientUri.Segments[1], typeof(ClientImpl));
-            ServerInterface server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
-            server.Connect(clientUrl,userName);
+                Uri clientUri = new Uri(clientUrl);
 
-            string command = "";
-            StreamReader file = new StreamReader(scriptFileName);
-            while ((command = file.ReadLine()) != null)
+                TcpChannel channel = new TcpChannel(clientUri.Port);
+                ChannelServices.RegisterChannel(channel, false);
+
+                Console.WriteLine(userName);
+
+                ClientImpl MeetingClient = new ClientImpl(userName);
+                RemotingServices.Marshal(MeetingClient, clientUri.Segments[1], typeof(ClientImpl));
+                ServerInterface server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
+                server.Connect(clientUrl,userName);
+
+                string command = "";
+                StreamReader file = new StreamReader(scriptFileName);
+                while ((command = file.ReadLine()) != null)
+                {
+                    MeetingClient.ReadCommands(command);
+                }
+                file.Close();
+
+
+                while (true)
+                {
+                    command = Console.ReadLine();
+                    MeetingClient.ReadCommands(command);
+                }
+            } catch (Exception e)
             {
-                MeetingClient.ReadCommands(command);
-            }
-            file.Close();
-
-            while (true)
-            {
-                command = Console.ReadLine();
-                MeetingClient.ReadCommands(command);
+                Console.WriteLine(e.StackTrace);
+                Console.WriteLine(e.Message);
+                Console.ReadLine();
             }
 
         }
@@ -154,7 +166,7 @@ namespace Project
             this.Meetings.Add(p.Topic, p);
         }
 
-        public void UpdateMeetings(Dictionary<string, Proposal> proposals, Dictionary<Location, List<Meeting>> meetings)
+        public void UpdateMeetings(Dictionary<string, Proposal> proposals, Dictionary<string, LocationMeetings> meetings)
         {
             foreach(KeyValuePair<String, Proposal> entry in proposals)
             {
@@ -171,9 +183,9 @@ namespace Project
             }
 
 
-            foreach (KeyValuePair<Location, List<Meeting>> entry in meetings)
+            foreach (KeyValuePair<string, LocationMeetings> entry in meetings)
             {
-                foreach (Meeting m1 in entry.Value) { 
+                foreach (Meeting m1 in entry.Value.Meetings) { 
 
 
                     //Respetivo meeting no cliente
