@@ -2,13 +2,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Runtime.Remoting;
 using System.Runtime.Remoting.Channels;
 using System.Runtime.Remoting.Channels.Tcp;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace Project
 {
@@ -42,8 +39,8 @@ namespace Project
         Dictionary<String, ClientInterface> Clients;
         Dictionary<String, Proposal> Proposals;
         Dictionary<String, LocationMeetings> Meetings;
-
-        Dictionary<string, Uri> Servers;
+        List<string> Servers;
+        
         int id;
         String url;
         int maxFaults;
@@ -62,6 +59,7 @@ namespace Project
             this.Proposals = new Dictionary<String, Proposal>();
             this.Clients = new Dictionary<String, ClientInterface>();
             this.Meetings = new Dictionary<string, LocationMeetings>();
+            this.Servers = new List<string>();
 
             this.puppetURL = puppetURL;
         }
@@ -111,11 +109,13 @@ namespace Project
                 {
                     p.IsCancelled = true;
                     p.Version += 1;
+                    UpdateServers(p);
                     return;
                 }
                 Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, p.Attendees);
                 this.Meetings[chosenSlot.Location.Local].addMeeting(meeting);
                 this.Proposals.Remove(p.Topic);
+                UpdateServers(meeting);
             }
         }
 
@@ -132,6 +132,7 @@ namespace Project
             }
             Proposal p = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, Slots, invitees);
             Proposals.Add(p.Topic, p);
+            UpdateServers(p);
             if (n_invitees > 0)
             {
                 foreach (String s in invitees)
@@ -173,6 +174,7 @@ namespace Project
                 Attendee a = new Attendee(userName, Slots);
                 p.Version += 1;
                 p.Attendees.Add(a);
+                UpdateServers(p);
             } else {
                 Console.WriteLine("Sou o/a " + userName + " e estou a dar join a um meeting onde nao estou convidado/a");
             }
@@ -197,18 +199,6 @@ namespace Project
             }
             Console.WriteLine("Registei o cliente");
 
-        }
-
-        public void shutdown()
-        {
-            Thread thread = new Thread(new ThreadStart(localShutdown));
-            thread.Start();
-        }
-
-        private void localShutdown()
-        {
-            Thread.Sleep(2000);
-            Environment.Exit(0);
         }
 
         public void InitializeLocationsAndRooms()
@@ -247,6 +237,37 @@ namespace Project
             file.Close();
         }
 
+        private void UpdateServers(AbstractMeeting absMeeting)
+        {
+            foreach(String url in this.Servers)
+            {
+                ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
+                si.UpdateMeeting(absMeeting);
+            }
+        } 
+
+        public void UpdateMeeting(AbstractMeeting absMeeting)
+        {
+            if (absMeeting.isProposal())
+            {
+                this.Proposals[absMeeting.Topic] = (Proposal) absMeeting;
+            }
+            else
+            {
+
+                Meeting m = (Meeting)absMeeting;
+                this.Proposals.Remove(absMeeting.Topic);
+                this.Meetings[m.Slot.Location.Local].addMeeting(m);
+            }
+            
+        }
+
+        public void AddServer(String serverURL)
+        {
+            this.Servers.Add(serverURL);
+        }
+
+
         public void AddRoom(string location, int capacity, string room_name)
         {
             lock (this)
@@ -256,6 +277,7 @@ namespace Project
                 l.addRoom(room);
             }
         }
+
 
         public void Status()
         {
@@ -279,6 +301,18 @@ namespace Project
         public void Unfreeze(string server_id)
         {
             throw new NotImplementedException();
+        }
+
+        public void shutdown()
+        {
+            Thread thread = new Thread(new ThreadStart(localShutdown));
+            thread.Start();
+        }
+
+        private void localShutdown()
+        {
+            Thread.Sleep(2000);
+            Environment.Exit(0);
         }
 
 

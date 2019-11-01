@@ -36,6 +36,8 @@ namespace Project
         void CloseMeeting(String userName,String topic);
 
         void Connect(String URL,String userName);
+
+        void UpdateMeeting(AbstractMeeting absMeeting);
     }
 
     [Serializable]
