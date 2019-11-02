@@ -32,6 +32,7 @@
             this.Send = new System.Windows.Forms.Button();
             this.PastCommand = new System.Windows.Forms.TextBox();
             this.button2 = new System.Windows.Forms.Button();
+            this.Status = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // CommandBox
@@ -75,11 +76,22 @@
             this.button2.UseVisualStyleBackColor = true;
             this.button2.Click += new System.EventHandler(this.button2_Click);
             // 
+            // Status
+            // 
+            this.Status.Location = new System.Drawing.Point(1103, 187);
+            this.Status.Name = "Status";
+            this.Status.Size = new System.Drawing.Size(200, 46);
+            this.Status.TabIndex = 5;
+            this.Status.Text = "Status";
+            this.Status.UseVisualStyleBackColor = true;
+            this.Status.Click += new System.EventHandler(this.Status_Click);
+            // 
             // PuppetMaster
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(12F, 25F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1767, 864);
+            this.Controls.Add(this.Status);
             this.Controls.Add(this.button2);
             this.Controls.Add(this.PastCommand);
             this.Controls.Add(this.Send);
@@ -99,6 +111,7 @@
         private System.Windows.Forms.Button Send;
         private System.Windows.Forms.TextBox PastCommand;
         private System.Windows.Forms.Button button2;
+        private System.Windows.Forms.Button Status;
     }
 }
 

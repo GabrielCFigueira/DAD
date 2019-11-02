@@ -28,10 +28,12 @@ namespace Project
                 TcpChannel channel = new TcpChannel(clientUri.Port);
                 ChannelServices.RegisterChannel(channel, false);
 
+                Console.WriteLine(userName);
+
                 ClientImpl MeetingClient = new ClientImpl(userName);
                 RemotingServices.Marshal(MeetingClient, clientUri.Segments[1], typeof(ClientImpl));
                 ServerInterface server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
-                server.Connect(clientUrl, userName);
+                server.Connect(clientUrl,userName);
 
                 string command = "";
                 StreamReader file = new StreamReader(scriptFileName);
@@ -41,15 +43,17 @@ namespace Project
                 }
                 file.Close();
 
+
                 while (true)
                 {
                     command = Console.ReadLine();
                     MeetingClient.ReadCommands(command);
                 }
-            } catch(Exception e)
+            } catch (Exception e)
             {
-                Console.WriteLine(e);
-                Thread.Sleep(100000);
+                Console.WriteLine(e.StackTrace);
+                Console.WriteLine(e.Message);
+                Console.ReadLine();
             }
 
         }
@@ -166,7 +170,7 @@ namespace Project
             this.Meetings.Add(p.Topic, p);
         }
 
-        public void UpdateMeetings(Dictionary<string, Proposal> proposals, Dictionary<Location, List<Meeting>> meetings)
+        public void UpdateMeetings(Dictionary<string, Proposal> proposals, Dictionary<string, LocationMeetings> meetings)
         {
             foreach(KeyValuePair<String, Proposal> entry in proposals)
             {
@@ -183,9 +187,9 @@ namespace Project
             }
 
 
-            foreach (KeyValuePair<Location, List<Meeting>> entry in meetings)
+            foreach (KeyValuePair<string, LocationMeetings> entry in meetings)
             {
-                foreach (Meeting m1 in entry.Value) { 
+                foreach (Meeting m1 in entry.Value.Meetings) { 
 
 
                     //Respetivo meeting no cliente

@@ -21,7 +21,7 @@ namespace Project
 
         void AddProposal(Proposal p);
 
-        void UpdateMeetings(Dictionary<String, Proposal> proposals, Dictionary<Location, List<Meeting>> meetings);
+        void UpdateMeetings(Dictionary<String, Proposal> proposals, Dictionary<string, LocationMeetings> meetings);
 
     }
 
@@ -36,12 +36,68 @@ namespace Project
         void CloseMeeting(String userName,String topic);
 
         void Connect(String URL,String userName);
+
+        void UpdateMeeting(AbstractMeeting absMeeting);
+    }
+
+    [Serializable]
+    public class LocationMeetings
+    {
+        private string locationName;
+        private Location location;
+        private List<Meeting> meetings;
+
+        public LocationMeetings(Location location)
+        {
+            locationName = location.Local;
+            this.location = location;
+            meetings = new List<Meeting>();
+        }
+
+        public string LocationName
+        {
+            get { return locationName; }
+            set { locationName = value; }
+        }
+
+        public Location Location
+        {
+            get { return location; }
+            set { location = value; }
+        }
+
+        public List<Meeting> Meetings
+        {
+            get { return meetings; }
+        }
+
+        public void addMeeting(Meeting meeting)
+        {
+            meetings.Add(meeting);
+        }
     }
 
     [Serializable]
     public abstract class AbstractMeeting
     {
         int version;
+        string coordinator;
+        string topic;
+        int min_attendees;
+        int n_invitees;
+        List<String> invitees;
+        List<Attendee> attendees;
+
+        public AbstractMeeting(String coordinator, String topic, int min_attendees, int n_invitees, List<String> invitees, int lastVersion, List<Attendee> attendees)
+        {
+            this.Coordinator = coordinator;
+            this.Topic = topic;
+            this.Min_attendees = min_attendees;
+            this.N_invitees = n_invitees;
+            this.Invitees = invitees;
+            this.Version = lastVersion + 1;
+            this.Attendees = attendees;
+        }
 
         public int Version
         {
@@ -49,37 +105,13 @@ namespace Project
             set { version = value; }
         }
 
-        public abstract Boolean isProposal();
-
-        public abstract void PrintInfo();
-    }
-
-    [Serializable]
-    public class Meeting:AbstractMeeting
-    {
-        String coordinator;
-        String topic;
-        int min_attendees;
-        int n_slots;
-        int n_invitees;
-        Slot slot;
-        List<String> invitees;
-        List<Attendee> attendees;
-        Room selectedRoom;
-
-        public String Coordinator
+        public string Coordinator
         {
             get { return coordinator; }
             set { coordinator = value; }
         }
 
-        public Room SelectedRoom
-        {
-            get { return selectedRoom; }
-            set { selectedRoom = value; }
-        }
-
-        public String Topic
+        public string Topic
         {
             get { return topic; }
             set { topic = value; }
@@ -91,22 +123,10 @@ namespace Project
             set { min_attendees = value; }
         }
 
-        public int N_slots
-        {
-            get { return n_slots; }
-            set { n_slots = value; }
-        }
-
         public int N_invitees
         {
             get { return n_invitees; }
             set { n_invitees = value; }
-        }
-
-        public Slot Slot
-        {
-            get { return slot; }
-            set { slot = value; }
         }
 
         public List<String> Invitees
@@ -121,19 +141,36 @@ namespace Project
             set { attendees = value; }
         }
 
-        public Meeting(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, Slot slot, List<String> invitees, int lastVersion, Room selectedRoom, List<Attendee> attendees)
+        public abstract Boolean isProposal();
+
+        public abstract void PrintInfo();
+    }
+
+
+
+    [Serializable]
+    public class Meeting:AbstractMeeting
+    {
+        Slot slot;
+        Room selectedRoom;
+
+        public Room SelectedRoom
         {
-            this.Coordinator = coordinator;
-            this.Topic = topic;
-            this.Min_attendees = min_attendees;
-            this.N_slots = n_slots;
-            this.N_invitees = n_invitees;
+            get { return selectedRoom; }
+            set { selectedRoom = value; }
+        }
+
+        public Slot Slot
+        {
+            get { return slot; }
+            set { slot = value; }
+        }
+
+        public Meeting(String coordinator, String topic, int min_attendees, int n_invitees, Slot slot, List<String> invitees, int lastVersion, Room selectedRoom, List<Attendee> attendees)
+            : base(coordinator, topic, min_attendees, n_invitees, invitees, lastVersion, attendees) 
+        {
             this.slot = slot;
-            this.Invitees = invitees;
-            this.Attendees = new List<Attendee>();
-            this.Version = lastVersion + 1;
             this.SelectedRoom = selectedRoom;
-            this.Attendees = attendees;
         }
 
         public override Boolean isProposal()
@@ -144,7 +181,7 @@ namespace Project
         public override void PrintInfo()
         {
             String message = "\r\nMEETING\r\n";
-            message += "Coordinator: " + this.Coordinator + "\r\nTopic: " + this.Topic + "\r\nMin_attendees: " + this.Min_attendees + "\r\nN_slots: " + this.N_slots + " \r\nN_invitees: " + this.N_invitees + "\r\nLocal: " + this.Slot.Location.Local;
+            message += "Coordinator: " + this.Coordinator + "\r\nTopic: " + this.Topic + "\r\nMin_attendees: " + this.Min_attendees + " \r\nN_invitees: " + this.N_invitees + "\r\nLocal: " + this.Slot.Location.Local;
             message += "\r\nInvitees: ";
             foreach (String s in this.Invitees)
             {
@@ -192,50 +229,14 @@ namespace Project
     [Serializable]
     public class Proposal:AbstractMeeting
     {
-        String coordinator;
-        String topic;
-        int min_attendees;
         int n_slots;
-        int n_invitees;
         Dictionary<String,Slot> slots;
-        List<String> invitees;
-        List<Attendee> attendees;
         Boolean isCancelled;
-
-        public String Coordinator
-        {
-            get { return coordinator; }
-            set { coordinator = value; }
-        }
 
         public Boolean IsCancelled
         {
             get { return isCancelled; }
             set { isCancelled = value; }
-        }
-
-        public String Topic
-        {
-            get { return topic; }
-            set { topic = value; }
-        }
-
-        public int Min_attendees
-        {
-            get { return min_attendees; }
-            set { min_attendees = value; }
-        }
-
-        public int N_slots
-        {
-            get { return n_slots; }
-            set { n_slots = value; }
-        }
-
-        public int N_invitees
-        {
-            get { return n_invitees; }
-            set { n_invitees = value; }
         }
 
         public Dictionary<String,Slot> Slots
@@ -244,29 +245,17 @@ namespace Project
             set { slots = value; }
         }
 
-        public List<String> Invitees
+        public int N_slots
         {
-            get { return invitees; }
-            set { invitees = value; }
-        }
-
-        public List<Attendee> Attendees
-        {
-            get { return attendees; }
-            set { attendees = value; }
+            get { return n_slots; }
+            set { n_slots = value; }
         }
 
         public Proposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, Dictionary<String,Slot> slots, List<String> invitees)
+            : base(coordinator, topic, min_attendees, n_invitees, invitees, 1, new List<Attendee>())
         {
-            this.Coordinator = coordinator;
-            this.Topic = topic;
-            this.Min_attendees = min_attendees;
-            this.N_slots = n_slots;
-            this.N_invitees = n_invitees;
+            this.n_slots = n_slots;
             this.Slots = slots;
-            this.Invitees = invitees;
-            this.Attendees = new List<Attendee>();
-            this.Version = 1;
             this.isCancelled = false;
         }
 

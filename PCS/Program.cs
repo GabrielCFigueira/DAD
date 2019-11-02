@@ -31,10 +31,10 @@ namespace PCS
 
     class PCSImpl : MarshalByRefObject, IPCS
     {
-        public void createServer(string serverID, string url, string maxFaults, string minDelay, string maxDelay)
+        public void createServer(string serverID, string url, string maxFaults, string minDelay, string maxDelay, string puppetURL)
         {
             ProcessStartInfo server = new ProcessStartInfo(@"..\..\..\Server\bin\Debug\Server.exe");
-            server.Arguments = "Server " + serverID + " " + url + " " + maxFaults + " " + minDelay + " " + maxDelay;
+            server.Arguments = "Server " + serverID + " " + url + " " + maxFaults + " " + minDelay + " " + maxDelay + " " + puppetURL;
             Process.Start(server);
         }
 

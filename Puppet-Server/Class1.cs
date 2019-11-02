@@ -10,14 +10,26 @@ namespace Puppet_Server
     {
     }
 
-    public interface IPS
+    public interface IPuppet
     {
-        /* void AddRoom(String location, int capacity, String room_name);
+        void AddRoom(String location, int capacity, String room_name, Uri uri);
 
-         void Status();
-         void Crash(String server_id);
-         void Freeze(String server_id);
-         void Unfreeze(String server_id); */
+        void Status(String url);
+        void Crash(String server_id);
+        void Freeze(String server_id);
+        void Unfreeze(String server_id);
+    }
+
+    public interface IServerPuppet
+    {
+        void AddRoom(String location, int capacity, String room_name);
+
+        void Status();
+        void Crash(String server_id);
+        void Freeze(String server_id);
+        void Unfreeze(String server_id);
+
+        void AddServer(String serverURL);
 
         void shutdown();
     }
