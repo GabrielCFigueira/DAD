@@ -152,7 +152,6 @@ namespace Project
             {
                 foreach (KeyValuePair<String, ClientInterface> entry in Clients)
                 {
-                    //Deve ser verificado se o user esta convidado ou nao para ver se mandamos isto ou nao
                     ClientInterface c = entry.Value;
                     c.AddProposal(p);
                 }
