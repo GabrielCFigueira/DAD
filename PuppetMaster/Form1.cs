@@ -141,14 +141,17 @@ namespace PuppetMaster
 
         public void addServer(string url)
         {
-            IServerPuppet newIps = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), url);
-            foreach (Uri uri in serverList)
+            lock (serverList)
             {
-                IServerPuppet ips = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), uri.AbsoluteUri);
-                ips.AddServer(url);
-                newIps.AddServer(uri.AbsoluteUri);
+                IServerPuppet newIps = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), url);
+                foreach (Uri uri in serverList)
+                {
+                    IServerPuppet ips = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), uri.AbsoluteUri);
+                    ips.AddServer(url);
+                    newIps.AddServer(uri.AbsoluteUri);
+                }
+                serverList.Add(new Uri(url));
             }
-            serverList.Add(new Uri(url));
         }
 
         public void addClient(string url)

@@ -259,13 +259,13 @@ namespace Project
 
         public void UpdateMeeting(AbstractMeeting absMeeting)
         {
+
             if (absMeeting.isProposal())
             {
                 this.Proposals[absMeeting.Topic] = (Proposal) absMeeting;
             }
             else
             {
-
                 Meeting m = (Meeting)absMeeting;
                 this.Proposals.Remove(absMeeting.Topic);
                 this.Meetings[m.Slot.Location.Local].addMeeting(m);
