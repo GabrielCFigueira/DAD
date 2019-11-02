@@ -143,7 +143,7 @@ namespace Project
 
         public abstract Boolean isProposal();
 
-        public abstract void PrintInfo();
+        public abstract string PrintInfo();
     }
 
 
@@ -178,7 +178,7 @@ namespace Project
             return false;
         }
 
-        public override void PrintInfo()
+        public override string PrintInfo()
         {
             String message = "\r\nMEETING\r\n";
             message += "Coordinator: " + this.Coordinator + "\r\nTopic: " + this.Topic + "\r\nMin_attendees: " + this.Min_attendees + " \r\nN_invitees: " + this.N_invitees + "\r\nLocal: " + this.Slot.Location.Local;
@@ -197,7 +197,7 @@ namespace Project
                 }
             }
             message += "\r\nSelected Room: " + this.SelectedRoom.Name + "\r\n";
-            Console.WriteLine(message);
+            return message;
         }
     }
 
@@ -264,7 +264,7 @@ namespace Project
             return true;
         }
 
-        public override void PrintInfo()
+        public override string PrintInfo()
         {
             String message = "\r\nPROPOSAL\r\n";
             message += "Coordinator: " + this.Coordinator + "\r\nTopic: " + this.Topic + "\r\nMin_attendees: " + this.Min_attendees + "\r\nN_slots: " + this.N_slots + " \r\nN_invitees: " + this.N_invitees + "\r\nSlots: ";
@@ -280,7 +280,6 @@ namespace Project
             if (this.IsCancelled)
             {
                 message += "\r\nState: CANCELLED\r\n";
-                Console.WriteLine(message);
             }
             else
             {
@@ -294,8 +293,8 @@ namespace Project
                     }
                 }
                 message += "\r\n";
-                Console.WriteLine(message);
             }
+            return message;
         }
     }
 

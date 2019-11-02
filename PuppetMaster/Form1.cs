@@ -134,6 +134,11 @@ namespace PuppetMaster
             }
         }
 
+        public override object InitializeLifetimeService()
+        {
+            return null;
+        }
+
         public void addPCS(string url)
         {
             pcsList.Add(new Uri(url));
