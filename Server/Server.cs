@@ -71,130 +71,153 @@ namespace Project
 
         public void CloseMeeting(String userName, String topic)
         {
-            Proposal p = this.Proposals[topic];
-            Slot chosenSlot = null;
-            Room selectedRoom = null;
-            double efficiency = 0;
-            if (p.Coordinator == userName)
+            lock (this.Proposals)
             {
-                foreach (Slot s in p.Slots.Values)
+                lock (this.Meetings)
                 {
-                    List<Meeting> meetings = this.Meetings[s.Location.Local].Meetings;
-                    if (meetings.Count != 0)
+                    Proposal p = this.Proposals[topic];
+                    Slot chosenSlot = null;
+                    Room selectedRoom = null;
+                    double efficiency = 0;
+                    if (p.Coordinator == userName)
                     {
-                        foreach (Meeting m in meetings)
+                        foreach (Slot s in p.Slots.Values)
                         {
-                            foreach (Room r in s.Location.Rooms)
+                            List<Meeting> meetings = this.Meetings[s.Location.Local].Meetings;
+                            if (meetings.Count != 0)
                             {
-                                if ((m.SelectedRoom != r || m.Slot.Date != s.Date) && s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
+                                foreach (Meeting m in meetings)
                                 {
-                                    double tempEfficiency = (double)s.Votes / r.Capacity;
-                                    if ((chosenSlot == null || (chosenSlot != null && chosenSlot.Votes <= s.Votes)) && tempEfficiency > efficiency)
+                                    foreach (Room r in s.Location.Rooms)
                                     {
+                                        if ((m.SelectedRoom != r || m.Slot.Date != s.Date) && s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
+                                        {
+                                            double tempEfficiency = (double)s.Votes / r.Capacity;
+                                            if ((chosenSlot == null || (chosenSlot != null && chosenSlot.Votes <= s.Votes)) && tempEfficiency > efficiency)
+                                            {
+                                                chosenSlot = s;
+                                                selectedRoom = r;
+                                                efficiency = tempEfficiency;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                foreach (Room r in s.Location.Rooms)
+                                {
+                                    if (s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
+                                    {
+                                        double tempEfficiency = (double)s.Votes / r.Capacity;
+                                        if ((chosenSlot == null || (chosenSlot != null && chosenSlot.Votes <= s.Votes)) && tempEfficiency > efficiency)
+                                        {
                                             chosenSlot = s;
                                             selectedRoom = r;
                                             efficiency = tempEfficiency;
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                    else
-                    {
-                        foreach (Room r in s.Location.Rooms)
+                        if (chosenSlot == null)
                         {
-                            if (s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
-                            {
-                                double tempEfficiency = (double) s.Votes / r.Capacity;
-                                if ((chosenSlot == null || (chosenSlot != null && chosenSlot.Votes <= s.Votes)) && tempEfficiency > efficiency)
-                                {
-                                        chosenSlot = s;
-                                        selectedRoom = r;
-                                        efficiency = tempEfficiency;
-                                }
-                            }
+                            p.IsCancelled = true;
+                            p.Version += 1;
+                            UpdateServers(p);
+                            return;
                         }
+                        Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, p.Attendees);
+                        this.Meetings[chosenSlot.Location.Local].addMeeting(meeting);
+                        this.Proposals.Remove(p.Topic);
+                        UpdateServers(meeting);
                     }
                 }
-                if (chosenSlot == null)
-                {
-                    p.IsCancelled = true;
-                    p.Version += 1;
-                    UpdateServers(p);
-                    return;
-                }
-                Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, p.Attendees);
-                this.Meetings[chosenSlot.Location.Local].addMeeting(meeting);
-                this.Proposals.Remove(p.Topic);
-                UpdateServers(meeting);
             }
         }
 
         public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
         {
-            Dictionary<String, Slot> Slots = new Dictionary<String, Slot>();
-            foreach (String s in slots)
+            lock (this.Proposals)
             {
-                string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
+                lock (this.Clients)
+                {
+                    Dictionary<String, Slot> Slots = new Dictionary<String, Slot>();
+                    foreach (String s in slots)
+                    {
+                        string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
 
-                Location l = Meetings[zone_date[0]].Location;
-                Slot slot = new Slot(l, zone_date[1]);
-                Slots.Add(s, slot);
-            }
-            Proposal p = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, Slots, invitees);
-            Proposals.Add(p.Topic, p);
-            UpdateServers(p);
-            if (n_invitees > 0)
-            {
-                foreach (String s in invitees)
-                {
-                    ClientInterface c = this.Clients[s];
-                    c.AddProposal(p);
-                }
-                this.Clients[coordinator].AddProposal(p);
-            }
-            else if (n_invitees == 0)
-            {
-                foreach (KeyValuePair<String, ClientInterface> entry in Clients)
-                {
-                    ClientInterface c = entry.Value;
-                    c.AddProposal(p);
+                        Location l = Meetings[zone_date[0]].Location;
+                        Slot slot = new Slot(l, zone_date[1]);
+                        Slots.Add(s, slot);
+                    }
+                    Proposal p = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, Slots, invitees);
+                    Proposals.Add(p.Topic, p);
+                    UpdateServers(p);
+                    if (n_invitees > 0)
+                    {
+                        foreach (String s in invitees)
+                        {
+                            ClientInterface c = this.Clients[s];
+                            c.AddProposal(p);
+                        }
+                        this.Clients[coordinator].AddProposal(p);
+                    }
+                    else if (n_invitees == 0)
+                    {
+                        foreach (KeyValuePair<String, ClientInterface> entry in Clients)
+                        {
+                            ClientInterface c = entry.Value;
+                            c.AddProposal(p);
+                        }
+                    }
                 }
             }
         }
 
         public void JoinMeeting(String topic, String userName, List<String> slots)
         {
-            Proposal p = this.Proposals[topic];
-            List<Slot> Slots = new List<Slot>();
-            if ((p.N_invitees != 0 && p.Invitees.Contains(userName)) || p.N_invitees == 0 || p.Coordinator == userName)
+            lock (this.Proposals)
             {
-                foreach (String s in slots)
+                Proposal p = this.Proposals[topic];
+                List<Slot> Slots = new List<Slot>();
+                if ((p.N_invitees != 0 && p.Invitees.Contains(userName)) || p.N_invitees == 0 || p.Coordinator == userName)
                 {
-                    string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
-                    
-                    Location l = Meetings[zone_date[0]].Location;
-                    Slot slot = new Slot(l, zone_date[1]);
-                    p.Slots[s].Votes += 1;
-                    slot.Votes = p.Slots[s].Votes;
-                    Slots.Add(slot);
+                    foreach (String s in slots)
+                    {
+                        string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
 
+                        Location l = Meetings[zone_date[0]].Location;
+                        Slot slot = new Slot(l, zone_date[1]);
+                        p.Slots[s].Votes += 1;
+                        slot.Votes = p.Slots[s].Votes;
+                        Slots.Add(slot);
+
+                    }
+
+                    Attendee a = new Attendee(userName, Slots);
+                    p.Version += 1;
+                    p.Attendees.Add(a);
+                    UpdateServers(p);
                 }
-
-                Attendee a = new Attendee(userName, Slots);
-                p.Version += 1;
-                p.Attendees.Add(a);
-                UpdateServers(p);
-            } else {
-                Console.WriteLine("Sou o/a " + userName + " e estou a dar join a um meeting onde nao estou convidado/a");
+                else
+                {
+                    Console.WriteLine("Sou o/a " + userName + " e estou a dar join a um meeting onde nao estou convidado/a");
+                }
             }
 
         }
 
         public void ListMeetings(String userName)
         {
-            ClientInterface c = this.Clients[userName];
-            c.UpdateMeetings(this.Proposals, this.Meetings);
+            lock (this.Proposals)
+            {
+                lock (this.Meetings)
+                {
+                    ClientInterface c = this.Clients[userName];
+                    c.UpdateMeetings(this.Proposals, this.Meetings);
+                }
+            }
         }
 
         public void Connect(string client_URL, string userName)
@@ -203,7 +226,7 @@ namespace Project
                  typeof(ClientInterface),
                  client_URL);
             c.Connect(this.url);
-            lock (this)
+            lock (this.Clients)
             {
                 Clients.Add(userName, c);
             }
@@ -249,25 +272,33 @@ namespace Project
 
         private void UpdateServers(AbstractMeeting absMeeting)
         {
-            foreach(String url in this.Servers)
+            lock (this.Servers)
             {
-                ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-                si.UpdateMeeting(absMeeting);
+                foreach (String url in this.Servers)
+                {
+                    ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
+                    si.UpdateMeeting(absMeeting);
+                }
             }
         } 
 
         public void UpdateMeeting(AbstractMeeting absMeeting)
         {
-
-            if (absMeeting.isProposal())
+            lock (this.Proposals)
             {
-                this.Proposals[absMeeting.Topic] = (Proposal) absMeeting;
-            }
-            else
-            {
-                Meeting m = (Meeting)absMeeting;
-                this.Proposals.Remove(absMeeting.Topic);
-                this.Meetings[m.Slot.Location.Local].addMeeting(m);
+                lock (this.Meetings)
+                {
+                    if (absMeeting.isProposal())
+                    {
+                        this.Proposals[absMeeting.Topic] = (Proposal)absMeeting;
+                    }
+                    else
+                    {
+                        Meeting m = (Meeting)absMeeting;
+                        this.Proposals.Remove(absMeeting.Topic);
+                        this.Meetings[m.Slot.Location.Local].addMeeting(m);
+                    }
+                }
             }
             
         }
@@ -280,7 +311,7 @@ namespace Project
 
         public void AddRoom(string location, int capacity, string room_name)
         {
-            lock (this)
+            lock (this.Meetings)
             {
                 Location l = Meetings[location].Location;
                 Room room = new Room(room_name, capacity);

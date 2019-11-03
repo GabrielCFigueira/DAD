@@ -4,6 +4,7 @@ list
 wait 3000
 join Pokemon 1 Porto,16-05-19
 list
-wait 3000
+wait 5000
+list
 close Pokemon
 list
