@@ -31,6 +31,11 @@ namespace PCS
 
     class PCSImpl : MarshalByRefObject, IPCS
     {
+        public override object InitializeLifetimeService()
+        {
+            return null;
+        }
+
         public void createServer(string serverID, string url, string maxFaults, string minDelay, string maxDelay, string puppetURL)
         {
             ProcessStartInfo server = new ProcessStartInfo(@"..\..\..\Server\bin\Debug\Server.exe");

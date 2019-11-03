@@ -180,7 +180,7 @@ namespace Project
                 //Respetivo proposal no cliente
                 AbstractMeeting p2;
                 this.Meetings.TryGetValue(p1.Topic, out p2);
-                if((p2 != null && p1.Version > p2.Version) || p2 == null)  //  || p2 == null  shouldnt be necessary in the condition TODO why?
+                if(p2 != null && p1.Version > p2.Version)  //  || p2 == null  shouldnt be necessary in the condition TODO why?
                 {
                     this.Meetings[p1.Topic] = p1;
                 } 
@@ -205,7 +205,7 @@ namespace Project
             foreach (KeyValuePair<String, AbstractMeeting> entry in Meetings)
             {
                 AbstractMeeting m = entry.Value;
-                m.PrintInfo();
+                Console.WriteLine(m.PrintInfo());
             }
         }
     }
