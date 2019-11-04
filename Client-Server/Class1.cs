@@ -75,6 +75,20 @@ namespace Project
         {
             meetings.Add(meeting);
         }
+
+        public override string ToString()
+        {
+            string s = "";
+            if ( meetings.Count != 0)
+            {
+                foreach (Meeting m in meetings)
+                {
+                    s += "\t" + m.PrintInfo();
+                }
+            } else { return "\t No Meetings Available"; }
+            
+            return s;
+        }
     }
 
     [Serializable]
@@ -320,6 +334,11 @@ namespace Project
         {
             this.Name = name;
             this.Capacity = capacity;
+        }
+
+        public override string ToString()
+        {
+            return "Name: " +  name +  " Capacity: " + capacity;
         }
     }
 

@@ -249,7 +249,6 @@ namespace PuppetMaster
         public void Status(string status)
         {
             pastCommand.Text += status + "\"\r\n";
-            throw new NotImplementedException();
         }
 
         public void Crash(string server_id)

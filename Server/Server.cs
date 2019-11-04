@@ -322,11 +322,56 @@ namespace Project
 
         public void Status()
         {
-            //string status = "Ola";
-            IPuppet puppet = (IPuppet)Activator.GetObject(typeof(IPuppet), puppetURL);
-            Console.WriteLine("Mandei um status de ola");
-            puppet.Status("OLA");
-            throw new NotImplementedException();
+            Console.WriteLine("\n-----STATUS-----\n");
+            Console.WriteLine("I'm ALIVE!");
+            Console.WriteLine("Server id: " + id + " Server url: " + url);
+            //Console.WriteLine("Maximum Faults: " + maxFaults);
+            //Console.WriteLine("Maximum Delay: " +  maxDelay);
+            //Console.WriteLine("Minimum Delay: " +  minDelay);
+            
+            Console.WriteLine("Servers that are alive: ");
+            if (Servers.Count != 0) 
+            {
+                foreach (string s in Servers)
+                {
+                    Console.WriteLine("Server: " + s);
+                }
+            } else { Console.WriteLine("No Servers Available"); }
+
+            Console.WriteLine("Clients:");
+            if (Clients.Keys.Count != 0)
+            {
+                foreach (string client in Clients.Keys)
+                {
+                    Console.WriteLine("\t" + client);
+                }
+            } else { Console.WriteLine("\t No Clients Available"); }
+
+            Console.WriteLine("Proposals: ");
+            if (Proposals.Keys.Count != 0)
+            {
+                foreach (string s in Proposals.Keys)
+                {
+                    Console.WriteLine("\t" + s);
+                    Console.WriteLine("\t\t\t " + Proposals[s].PrintInfo());
+                }
+            } else { Console.WriteLine("\t No Proposals Available"); }
+          
+
+            Console.WriteLine("Locations and Meetings: ");
+            if (Meetings.Keys.Count != 0)
+            {
+                foreach (string location in Meetings.Keys)
+                {
+                    Console.WriteLine("\t" + location);
+                    foreach (Room room in Meetings[location].Location.Rooms)
+                    {
+                        Console.WriteLine("\t\t" + room.ToString());
+                    }
+                    Console.WriteLine("\t\t" + Meetings[location].ToString());
+                }
+            } else { Console.WriteLine("\t No Locations Available"); }
+
         }
 
         public void Crash(string server_id)
