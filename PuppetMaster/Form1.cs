@@ -29,7 +29,7 @@ namespace PuppetMaster
             InitializeComponent();
             TcpChannel channel = new TcpChannel(10001);
             ChannelServices.RegisterChannel(channel, false);
-            pmi = new PuppetMasterImp("..\\..\\PCShostnames.txt", "..\\..\\Commands.txt", PastCommand);
+            pmi = new PuppetMasterImp("..\\..\\PCShostnames.txt", "..\\..\\Commands.txt");
             RemotingServices.Marshal(pmi, "PuppetMaster", typeof(PuppetMasterImp));
 
         }
@@ -39,6 +39,7 @@ namespace PuppetMaster
 
         }
 
+        //Send
         private void Button1_Click(object sender, EventArgs e)
         {
             string command = CommandBox.Text;
@@ -48,11 +49,9 @@ namespace PuppetMaster
                 return;
 
             PastCommand.Text += pmi.readCommand(command) + "\r\n";
-
-
-     
         }
 
+        //AddRoom
         private void button2_Click(object sender, EventArgs e)
         {
             string command = CommandBox.Text;
@@ -66,18 +65,20 @@ namespace PuppetMaster
                 return;
             }
 
-            foreach (Uri serverURL in pmi.getServers())
-            {
-                // Testar isto outra vez
-                int capacity = Int32.Parse(commands[1]);
-                string location = commands[0];
-                string room_name = commands[2];
+            int capacity = Int32.Parse(commands[1]);
+            string location = commands[0];
+            string room_name = commands[2];
 
-                IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), serverURL.AbsoluteUri);
+            PastCommand.Text += "Added a Room: " + room_name + " in the Location: " + location + " with Capacity: " + capacity + "\r\n";
+            
+            foreach (string serverID in pmi.getServers().Keys)
+            {
+                IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), pmi.getServers()[serverID].AbsoluteUri);
                 server.AddRoom(location, capacity, room_name);
             }
         }
 
+        //TextBox for past commands
         private void PastCommand_TextChanged(object sender, EventArgs e)
         {
 
@@ -90,35 +91,60 @@ namespace PuppetMaster
 
         private void Status_Click(object sender, EventArgs e)
         {
-            foreach (Uri serverURL in pmi.getServers())
+            PastCommand.Text += "Servers printed their Status\r\n";
+
+            foreach (string serverID in pmi.getServers().Keys)
             {
-                IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), serverURL.AbsoluteUri);
+                IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), pmi.getServers()[serverID].AbsoluteUri);
                 server.Status();
             }
+        }
+
+        private void Crash_Click(object sender, EventArgs e)
+        {
+            string command = CommandBox.Text;
+            CommandBox.Text = "";
+            string[] commands = command.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            if (commands.Length == 0)
+                return;
+            if (commands.Length < 0)
+            {
+                PastCommand.Text += "Invalid Command: \"" + command + "\"\r\n";
+                return;
+            }
+
+            string serverID = commands[0];
+
+            PastCommand.Text += "Crashing Server: " + serverID;
+
+            string url = pmi.getServers()[serverID].AbsoluteUri;
+
+            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), url);
+            server.Crash();
+
+            //Removes from the server dictionary
+            pmi.getServers().Remove(serverID);
         }
     }
 
     public class PuppetMasterImp : MarshalByRefObject, IPuppet
     {
         private List<Uri> pcsList;
-        private List<Uri> serverList;
+        private Dictionary<string, Uri> serverDict;
         private List<Uri> clientList;
-
-        private TextBox pastCommand;
 
         delegate void CreateServerDelegate(string s1, string s2, string s3, string s4, string s5, string s6);
         delegate void CreateClientDelegate(string s1, string s2, string s3, string s4);
 
 
 
-        public PuppetMasterImp(string pcsHostnameFile, string commandsFile, TextBox PastCommand)
+        public PuppetMasterImp(string pcsHostnameFile, string commandsFile)
         {
-            serverList = new List<Uri>();
             pcsList = new List<Uri>();
             clientList = new List<Uri>();
+            serverDict = new Dictionary<string, Uri>();
 
-            pastCommand = PastCommand;
-
+            
             System.IO.StreamReader file = new System.IO.StreamReader(pcsHostnameFile);
 
             string line;
@@ -144,18 +170,18 @@ namespace PuppetMaster
             pcsList.Add(new Uri(url));
         }
 
-        public void addServer(string url)
+        public void addServer(string serverID, string url)
         {
-            lock (serverList)
+            lock (serverDict)
             {
                 IServerPuppet newIps = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), url);
-                foreach (Uri uri in serverList)
+                foreach (string serverId in serverDict.Keys)
                 {
-                    IServerPuppet ips = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), uri.AbsoluteUri);
+                    IServerPuppet ips = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), serverDict[serverId].AbsoluteUri);
                     ips.AddServer(url);
-                    newIps.AddServer(uri.AbsoluteUri);
+                    newIps.AddServer(serverDict[serverId].AbsoluteUri);
                 }
-                serverList.Add(new Uri(url));
+                serverDict.Add(serverID, new Uri(url));
             }
         }
 
@@ -199,7 +225,7 @@ namespace PuppetMaster
                     break;
                 }
             }
-            addServer(url);
+            addServer(serverID, url);
 
         }
 
@@ -225,9 +251,9 @@ namespace PuppetMaster
                 ipcs.shutdown();
             }
 
-            foreach(Uri url in serverList)
+            foreach(string serverID in serverDict.Keys)
             {
-                IServerPuppet ips = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), url.AbsoluteUri);
+                IServerPuppet ips = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), serverDict[serverID].AbsoluteUri);
                 ips.shutdown();
             }
 
@@ -235,10 +261,9 @@ namespace PuppetMaster
             Environment.Exit(0);
         }
 
-        public List<Uri> getServers()
+        public Dictionary<string, Uri> getServers() // Mudar isto para getServers
         {
-            
-            return serverList;
+            return serverDict; 
         }
 
         //Se calhar nao preciso disto para a interface do Puppet
@@ -246,9 +271,10 @@ namespace PuppetMaster
         {
             throw new NotImplementedException();
         }
+        //Nao preciso disto para a interface do Puppet
         public void Status(string status)
         {
-            pastCommand.Text += status + "\"\r\n";
+            throw new NotImplementedException();
         }
 
         public void Crash(string server_id)

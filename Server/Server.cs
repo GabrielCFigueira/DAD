@@ -374,9 +374,9 @@ namespace Project
 
         }
 
-        public void Crash(string server_id)
+        public void Crash()
         {
-            throw new NotImplementedException();
+            shutdown();
         }
 
         public void Freeze(string server_id)

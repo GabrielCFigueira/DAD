@@ -33,6 +33,7 @@
             this.PastCommand = new System.Windows.Forms.TextBox();
             this.button2 = new System.Windows.Forms.Button();
             this.Status = new System.Windows.Forms.Button();
+            this.Crash = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // CommandBox
@@ -86,11 +87,22 @@
             this.Status.UseVisualStyleBackColor = true;
             this.Status.Click += new System.EventHandler(this.Status_Click);
             // 
+            // Crash
+            // 
+            this.Crash.Location = new System.Drawing.Point(1103, 284);
+            this.Crash.Name = "Crash";
+            this.Crash.Size = new System.Drawing.Size(200, 45);
+            this.Crash.TabIndex = 6;
+            this.Crash.Text = "Crash";
+            this.Crash.UseVisualStyleBackColor = true;
+            this.Crash.Click += new System.EventHandler(this.Crash_Click);
+            // 
             // PuppetMaster
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(12F, 25F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1767, 864);
+            this.Controls.Add(this.Crash);
             this.Controls.Add(this.Status);
             this.Controls.Add(this.button2);
             this.Controls.Add(this.PastCommand);
@@ -112,6 +124,7 @@
         private System.Windows.Forms.TextBox PastCommand;
         private System.Windows.Forms.Button button2;
         private System.Windows.Forms.Button Status;
+        private System.Windows.Forms.Button Crash;
     }
 }
 
