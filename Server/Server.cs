@@ -296,25 +296,43 @@ namespace Project
         {
             lock (this.Servers)
             {
-                foreach (String url in this.Servers)
+                Thread[] pool = new Thread[this.Servers.Count];
+                for (int i = 0; i < this.Servers.Count; i++)
                 {
-                    ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-                    si.UpdateMeeting(absMeeting);
+                    string url = this.Servers[i];
+                    pool[i] = new Thread(() => DoUpdate(url, absMeeting));
+                    pool[i].Start();
                 }
             }
         }
 
-        public void UpdateServersClients(String client_url, String userName)
+        private void DoUpdate(string url, AbstractMeeting absMeeting)
+        {
+            ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
+            si.UpdateMeeting(absMeeting);
+        }
+
+        public void UpdateServersClients(String clientUrl, String userName)
         {
             lock (this.Servers)
             {
-                foreach (String url in this.Servers)
+
+                Thread[] pool = new Thread[this.Servers.Count];
+                for (int i = 0; i < this.Servers.Count; i++)
                 {
-                    ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-                    Console.WriteLine("Sou o servidor e vou fazer update aos meus clientes");
-                    si.UpdateClient(client_url,userName);
+                    string url = this.Servers[i];
+                    pool[i] = new Thread(() => DoUpdateClient(url, clientUrl, userName));
+                    pool[i].Start();
                 }
+
             }
+        }
+
+        private void DoUpdateClient(string serverUrl, string clientUrl, string userName)
+        {
+            ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
+            Console.WriteLine("Sou o servidor e vou fazer update aos meus clientes");
+            si.UpdateClient(clientUrl, userName);
         }
 
         public void UpdateClient(String client_url,string userName)
@@ -353,7 +371,10 @@ namespace Project
 
         public void AddServer(String serverURL)
         {
-            this.Servers.Add(serverURL);
+            lock (this.Servers)
+            {
+                this.Servers.Add(serverURL);
+            }
         }
 
 
