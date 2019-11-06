@@ -79,6 +79,7 @@ namespace Project
                     Slot chosenSlot = null;
                     Room selectedRoom = null;
                     double efficiency = 0;
+                    int absVotesRoomCapacity = int.MaxValue;
                     if (p.Coordinator == userName)
                     {
                         foreach (Slot s in p.Slots.Values)
@@ -121,6 +122,26 @@ namespace Project
                             }
                         }
                         if (chosenSlot == null)
+                        {
+                            foreach(Slot s in p.Slots.Values)
+                            {
+                                foreach (Room r in s.Location.Rooms)
+                                {
+                                    int tempABS = Math.Abs(s.Votes - r.Capacity);
+                                    if (s.Votes >= p.Min_attendees &&  s.Votes >= r.Capacity && tempABS < absVotesRoomCapacity)
+                                    {
+                                        absVotesRoomCapacity = tempABS;
+                                        chosenSlot = s;
+                                        selectedRoom = r;
+                                    }
+                                }
+                            }
+                            while(p.Attendees.Count > selectedRoom.Capacity)
+                            {
+                                p.Attendees.RemoveAt(p.Attendees.Count - 1);
+                            }
+                        }
+                        if(chosenSlot == null && selectedRoom == null && absVotesRoomCapacity == int.MaxValue)
                         {
                             p.IsCancelled = true;
                             p.Version += 1;

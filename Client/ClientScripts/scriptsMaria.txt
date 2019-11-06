@@ -1,8 +1,8 @@
 wait 500
-create Pokemon 1 2 1 Lisboa,15-05-19 Porto,16-05-19 Joao
+create Pokemon 1 2 2 Lisboa,15-05-19 Porto,16-05-19 Joao Ze
 list
-wait 3000
-join Pokemon 1 Porto,16-05-19
+wait 500
+join Pokemon 1 Lisboa,15-05-19
 list
 wait 5000
 list
