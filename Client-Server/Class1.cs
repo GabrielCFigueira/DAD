@@ -38,6 +38,8 @@ namespace Project
         void Connect(String URL,String userName);
 
         void UpdateMeeting(AbstractMeeting absMeeting);
+
+        void UpdateClient(String client_url,String userName);
     }
 
     [Serializable]
@@ -342,7 +344,7 @@ namespace Project
         }
     }
 
-    [Serializable()]
+    [Serializable]
     public class Location
     {
         String local;

@@ -251,6 +251,7 @@ namespace Project
             {
                 Clients.Add(userName, c);
             }
+            this.UpdateServersClients(client_URL, userName);
             Console.WriteLine("Registei o cliente");
 
         }
@@ -291,7 +292,7 @@ namespace Project
             file.Close();
         }
 
-        private void UpdateServers(AbstractMeeting absMeeting)
+        public void UpdateServers(AbstractMeeting absMeeting)
         {
             lock (this.Servers)
             {
@@ -301,7 +302,33 @@ namespace Project
                     si.UpdateMeeting(absMeeting);
                 }
             }
-        } 
+        }
+
+        public void UpdateServersClients(String client_url, String userName)
+        {
+            lock (this.Servers)
+            {
+                foreach (String url in this.Servers)
+                {
+                    ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
+                    Console.WriteLine("Sou o servidor e vou fazer update aos meus clientes");
+                    si.UpdateClient(client_url,userName);
+                }
+            }
+        }
+
+        public void UpdateClient(String client_url,string userName)
+        {
+            lock (this.Clients)
+            {
+                ClientInterface ci = (ClientInterface)Activator.GetObject(typeof(ClientInterface), client_url);
+                if (!this.Clients.ContainsKey(userName))
+                {
+                    Console.WriteLine("Passei a conhecer o user " + userName);
+                    this.Clients[userName] = ci;
+                }
+            }
+        }
 
         public void UpdateMeeting(AbstractMeeting absMeeting)
         {
