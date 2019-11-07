@@ -1,3 +1,3 @@
-Lisboa:2,Room A,1,Room B,2
+Lisboa:2,Room A,1,Room B,5
 Porto:1,Room C,1
-Braga:3,Room D,1,Room E,1,Room F,1
+Braga:3,Room D,3,Room E,1,Room F,1

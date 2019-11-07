@@ -79,7 +79,6 @@ namespace Project
                     Slot chosenSlot = null;
                     Room selectedRoom = null;
                     double efficiency = 0;
-                    int absVotesRoomCapacity = int.MaxValue;
                     if (p.Coordinator == userName)
                     {
                         foreach (Slot s in p.Slots.Values)
@@ -91,10 +90,13 @@ namespace Project
                                 {
                                     foreach (Room r in s.Location.Rooms)
                                     {
-                                        if ((m.SelectedRoom != r || m.Slot.Date != s.Date) && s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
+                                        if ((m.SelectedRoom != r || m.Slot.Date != s.Date) && s.Votes >= p.Min_attendees)
                                         {
                                             double tempEfficiency = (double)s.Votes / r.Capacity;
-                                            if ((chosenSlot == null || (chosenSlot != null && chosenSlot.Votes <= s.Votes)) && tempEfficiency > efficiency)
+                                            if (chosenSlot == null
+                                            || Math.Min(chosenSlot.Votes, selectedRoom.Capacity) < Math.Min(s.Votes, r.Capacity)
+                                            || (Math.Min(chosenSlot.Votes, selectedRoom.Capacity) == Math.Min(s.Votes, r.Capacity)
+                                            && tempEfficiency > efficiency))
                                             {
                                                 chosenSlot = s;
                                                 selectedRoom = r;
@@ -108,10 +110,13 @@ namespace Project
                             {
                                 foreach (Room r in s.Location.Rooms)
                                 {
-                                    if (s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
+                                    if (s.Votes >= p.Min_attendees)
                                     {
                                         double tempEfficiency = (double)s.Votes / r.Capacity;
-                                        if ((chosenSlot == null || (chosenSlot != null && chosenSlot.Votes <= s.Votes)) && tempEfficiency > efficiency)
+                                        if (chosenSlot == null 
+                                            || Math.Min(chosenSlot.Votes, selectedRoom.Capacity) < Math.Min(s.Votes, r.Capacity)
+                                            || (Math.Min(chosenSlot.Votes, selectedRoom.Capacity) == Math.Min(s.Votes, r.Capacity) 
+                                            && tempEfficiency > efficiency))
                                         {
                                             chosenSlot = s;
                                             selectedRoom = r;
@@ -123,31 +128,16 @@ namespace Project
                         }
                         if (chosenSlot == null)
                         {
-                            foreach(Slot s in p.Slots.Values)
-                            {
-                                foreach (Room r in s.Location.Rooms)
-                                {
-                                    int tempABS = Math.Abs(s.Votes - r.Capacity);
-                                    if (s.Votes >= p.Min_attendees &&  s.Votes >= r.Capacity && tempABS < absVotesRoomCapacity)
-                                    {
-                                        absVotesRoomCapacity = tempABS;
-                                        chosenSlot = s;
-                                        selectedRoom = r;
-                                    }
-                                }
-                            }
-                            while(p.Attendees.Count > selectedRoom.Capacity)
-                            {
-                                p.Attendees.RemoveAt(p.Attendees.Count - 1);
-                            }
-                        }
-                        if(chosenSlot == null && selectedRoom == null && absVotesRoomCapacity == int.MaxValue)
-                        {
                             p.IsCancelled = true;
                             p.Version += 1;
                             UpdateServers(p);
                             return;
                         }
+                        while (p.Attendees.Count > selectedRoom.Capacity)
+                        {
+                            p.Attendees.RemoveAt(p.Attendees.Count - 1);
+                        }
+
                         Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, p.Attendees);
                         this.Meetings[chosenSlot.Location.Local].addMeeting(meeting);
                         this.Proposals.Remove(p.Topic);
