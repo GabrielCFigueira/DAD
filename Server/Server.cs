@@ -69,8 +69,17 @@ namespace Project
             return null;
         }
 
+        public void waitBetweenRequests()
+        {
+            Random timeout = new Random();
+            int timeSleeping = timeout.Next(this.minDelay, this.maxDelay);
+            Thread.Sleep(timeSleeping);
+            Console.WriteLine("Dormi por " + timeSleeping + " milisseconds");
+        }
+
         public void CloseMeeting(String userName, String topic)
         {
+            this.waitBetweenRequests();
             lock (this.Proposals)
             {
                 lock (this.Meetings)
@@ -149,6 +158,7 @@ namespace Project
 
         public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
         {
+            this.waitBetweenRequests();
             lock (this.Proposals)
             {
                 lock (this.Clients)
@@ -188,6 +198,7 @@ namespace Project
 
         public void JoinMeeting(String topic, String userName, List<String> slots)
         {
+            this.waitBetweenRequests();
             lock (this.Proposals)
             {
                 Proposal p = this.Proposals[topic];
@@ -221,6 +232,7 @@ namespace Project
 
         public void ListMeetings(String userName)
         {
+            this.waitBetweenRequests();
             lock (this.Proposals)
             {
                 lock (this.Meetings)
