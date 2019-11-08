@@ -394,6 +394,14 @@ namespace Project
                     if (absMeeting.isProposal())
                     {
                         this.Proposals[absMeeting.Topic] = (Proposal)absMeeting;
+                        if(((Proposal) absMeeting).IsCancelled)
+                        {
+                            lock(lockTicket)
+                            {
+                                lastTicket += 1;
+                                Console.WriteLine("Executei o ticket " + lastTicket);
+                            }
+                        }
                     }
                     else
                     {
