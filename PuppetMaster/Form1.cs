@@ -132,8 +132,9 @@ namespace PuppetMaster
         private List<Uri> pcsList;
         private Dictionary<string, Uri> serverDict;
         private List<Uri> clientList;
+        private string masterServer = "1";
 
-        delegate void CreateServerDelegate(string s1, string s2, string s3, string s4, string s5, string s6);
+        delegate void CreateServerDelegate(string s1, string s2, string s3, string s4, string s5, string s6, string s7);
         delegate void CreateClientDelegate(string s1, string s2, string s3, string s4);
 
 
@@ -197,7 +198,11 @@ namespace PuppetMaster
             {
                 case "Server":
                     CreateServerDelegate serverDelegate = new CreateServerDelegate(createServer);
-                    serverDelegate.BeginInvoke(commands[1], commands[2], commands[3], commands[4], commands[5], "tcp://localhost:10001/PuppetMaster", null, null);
+                    serverDelegate.BeginInvoke(commands[1], commands[2], commands[3], commands[4], commands[5], "tcp://localhost:10001/PuppetMaster", masterServer, null, null);
+                    if(masterServer == "1")
+                    {
+                        masterServer = commands[2];
+                    }
                     return command;
                 case "Client":
                     CreateClientDelegate clientDelegate = new CreateClientDelegate(createClient);
@@ -210,18 +215,18 @@ namespace PuppetMaster
                     shutdown();
                     return "Shutdown";
                 default:
-                    return "What are you doing noob";
+                    return "Wrong Command";
             }
         }
 
-        public void createServer(string serverID, string url, string maxFaults, string minDelay, string maxDelay, string puppetURL)
+        public void createServer(string serverID, string url, string maxFaults, string minDelay, string maxDelay, string puppetURL, string masterServer)
         {
             foreach (Uri pcsURL in pcsList)
             {
                 if (pcsURL.Host == (new Uri(url)).Host)
                 {
                     IPCS ipcs = (IPCS)Activator.GetObject(typeof(IPCS), pcsURL.AbsoluteUri);
-                    ipcs.createServer(serverID, url, maxFaults, minDelay, maxDelay, puppetURL);
+                    ipcs.createServer(serverID, url, maxFaults, minDelay, maxDelay, puppetURL, masterServer);
                     break;
                 }
             }

@@ -127,7 +127,7 @@ namespace Project
                     Thread.Sleep(interval);
                     break;
                 default:
-                    Console.WriteLine("What are you doing noob\r\n");
+                    Console.WriteLine("Wrong Command");
                     break;
             }
         }

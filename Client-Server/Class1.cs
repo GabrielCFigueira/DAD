@@ -40,6 +40,8 @@ namespace Project
         void UpdateMeeting(AbstractMeeting absMeeting);
 
         void UpdateClient(String client_url,String userName);
+
+        int GetTicket();
     }
 
     [Serializable]

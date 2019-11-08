@@ -20,12 +20,13 @@ namespace Project
             int maxDelay = Int32.Parse(args[5]);
 
             String puppetURL = args[6]; // O server precisa de ter o url do puppet (Martelado)
+            String masterServer = args[7]; // (Martelado)
 
             Uri uri = new Uri(url);
             TcpChannel channel = new TcpChannel(uri.Port);
             ChannelServices.RegisterChannel(channel, false);
 
-            ServerImpl MeetingServer = new ServerImpl(id,url,maxFaults,minDelay,maxDelay, puppetURL);
+            ServerImpl MeetingServer = new ServerImpl(id,url,maxFaults,minDelay,maxDelay, puppetURL, masterServer);
             RemotingServices.Marshal(MeetingServer, uri.Segments[1], typeof(ServerImpl));
 
             MeetingServer.InitializeLocationsAndRooms();
@@ -48,8 +49,12 @@ namespace Project
         int maxDelay;
 
         String puppetURL;
+        String masterServer;
+        String lockTicket = "";
+        Int32 ticket = 0;
+        Int32 lastTicket = 0;
 
-        public ServerImpl(int id, String url, int maxFaults, int minDelay, int maxDelay, String puppetURL)
+        public ServerImpl(int id, String url, int maxFaults, int minDelay, int maxDelay, String puppetURL, string masterServer)
         {
             this.id = id;
             this.url = url;
@@ -62,6 +67,7 @@ namespace Project
             this.Servers = new List<string>();
 
             this.puppetURL = puppetURL;
+            this.masterServer = masterServer;
         }
 
         public override object InitializeLifetimeService()
@@ -74,12 +80,33 @@ namespace Project
             Random timeout = new Random();
             int timeSleeping = timeout.Next(this.minDelay, this.maxDelay);
             Thread.Sleep(timeSleeping);
-            Console.WriteLine("Dormi por " + timeSleeping + " milisseconds");
         }
 
         public void CloseMeeting(String userName, String topic)
         {
             this.waitBetweenRequests();
+
+            int newTicket;
+            if(masterServer == "1")
+            {
+                newTicket = GetTicket();
+            }
+            else
+            {
+                ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), masterServer);
+                newTicket = si.GetTicket();
+            }
+
+            lock (lockTicket)
+            {
+                while (newTicket - 1 != lastTicket)
+                {
+                    Monitor.Wait(lockTicket);
+                }
+                lastTicket += 1;
+                Console.WriteLine("Executei o ticket " + lastTicket);
+            }
+
             lock (this.Proposals)
             {
                 lock (this.Meetings)
@@ -99,7 +126,7 @@ namespace Project
                                 {
                                     foreach (Room r in s.Location.Rooms)
                                     {
-                                        if ((m.SelectedRoom != r || m.Slot.Date != s.Date) && s.Votes >= p.Min_attendees)
+                                        if ((m.SelectedRoom.Name != r.Name || m.Slot.Date != s.Date) && s.Votes >= p.Min_attendees)
                                         {
                                             double tempEfficiency = (double)s.Votes / r.Capacity;
                                             if (chosenSlot == null
@@ -254,7 +281,7 @@ namespace Project
                 Clients.Add(userName, c);
             }
             this.UpdateServersClients(client_URL, userName);
-            Console.WriteLine("Registei o cliente");
+            Console.WriteLine("Registei o/a cliente " + userName);
 
         }
 
@@ -298,12 +325,13 @@ namespace Project
         {
             lock (this.Servers)
             {
-                Thread[] pool = new Thread[this.Servers.Count];
+                //Thread[] pool = new Thread[this.Servers.Count];
                 for (int i = 0; i < this.Servers.Count; i++)
                 {
                     string url = this.Servers[i];
-                    pool[i] = new Thread(() => DoUpdate(url, absMeeting));
-                    pool[i].Start();
+                    /*pool[i] = new Thread(() => DoUpdate(url, absMeeting));
+                    pool[i].Start();*/
+                    DoUpdate(url, absMeeting);
                 }
             }
         }
@@ -319,21 +347,28 @@ namespace Project
             lock (this.Servers)
             {
 
-                Thread[] pool = new Thread[this.Servers.Count];
+                //Thread[] pool = new Thread[this.Servers.Count];
                 for (int i = 0; i < this.Servers.Count; i++)
                 {
                     string url = this.Servers[i];
-                    pool[i] = new Thread(() => DoUpdateClient(url, clientUrl, userName));
-                    pool[i].Start();
-                }
+                    /*pool[i] = new Thread(() => DoUpdateClient(url, clientUrl, userName));
+                    pool[i].Start();*/
+                    DoUpdateClient(url, clientUrl, userName);
+            }
+
+                /*for (int i = 0; i < this.Servers.Count; i++)
+                {
+                    pool[i].Join();
+                }*/
 
             }
         }
 
         private void DoUpdateClient(string serverUrl, string clientUrl, string userName)
         {
+            Console.WriteLine("Sou o servidor e vou fazer update com o user 1" + userName);
             ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
-            Console.WriteLine("Sou o servidor e vou fazer update aos meus clientes");
+            Console.WriteLine("Sou o servidor e vou fazer update com o user 2" + userName);
             si.UpdateClient(clientUrl, userName);
         }
 
@@ -362,6 +397,11 @@ namespace Project
                     }
                     else
                     {
+                        lock(lockTicket)
+                        {
+                            lastTicket += 1;
+                            Console.WriteLine("Executei o ticket " + lastTicket);
+                        }
                         Meeting m = (Meeting)absMeeting;
                         this.Proposals.Remove(absMeeting.Topic);
                         this.Meetings[m.Slot.Location.Local].addMeeting(m);
@@ -470,6 +510,15 @@ namespace Project
         {
             Thread.Sleep(2000);
             Environment.Exit(0);
+        }
+
+
+        public int GetTicket()
+        {
+            lock (lockTicket)
+            {
+                return ++ticket;
+            }
         }
 
 
