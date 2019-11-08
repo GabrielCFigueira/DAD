@@ -325,13 +325,13 @@ namespace Project
         {
             lock (this.Servers)
             {
-                //Thread[] pool = new Thread[this.Servers.Count];
+                Thread[] pool = new Thread[this.Servers.Count];
                 for (int i = 0; i < this.Servers.Count; i++)
                 {
                     string url = this.Servers[i];
-                    /*pool[i] = new Thread(() => DoUpdate(url, absMeeting));
-                    pool[i].Start();*/
-                    DoUpdate(url, absMeeting);
+                    pool[i] = new Thread(() => DoUpdate(url, absMeeting));
+                    pool[i].Start();
+                    //DoUpdate(url, absMeeting);
                 }
             }
         }
@@ -347,13 +347,13 @@ namespace Project
             lock (this.Servers)
             {
 
-                //Thread[] pool = new Thread[this.Servers.Count];
+                Thread[] pool = new Thread[this.Servers.Count];
                 for (int i = 0; i < this.Servers.Count; i++)
                 {
                     string url = this.Servers[i];
-                    /*pool[i] = new Thread(() => DoUpdateClient(url, clientUrl, userName));
-                    pool[i].Start();*/
-                    DoUpdateClient(url, clientUrl, userName);
+                    pool[i] = new Thread(() => DoUpdateClient(url, clientUrl, userName));
+                    pool[i].Start();
+                    //DoUpdateClient(url, clientUrl, userName);
             }
 
                 /*for (int i = 0; i < this.Servers.Count; i++)
