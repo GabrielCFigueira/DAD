@@ -13,7 +13,7 @@ namespace Project
     {
         static void Main(string[] args)
         {
-            int id = Int32.Parse(args[1]);
+            string id = args[1];
             String url = args[2];
             int maxFaults = Int32.Parse(args[3]);
             int minDelay = Int32.Parse(args[4]);
@@ -42,7 +42,7 @@ namespace Project
         Dictionary<String, LocationMeetings> Meetings;
         List<string> Servers;
         
-        int id;
+        string id;
         String url;
         int maxFaults;
         int minDelay;
@@ -54,7 +54,7 @@ namespace Project
         Int32 ticket = 0;
         Int32 lastTicket = 0;
 
-        public ServerImpl(int id, String url, int maxFaults, int minDelay, int maxDelay, String puppetURL, string masterServer)
+        public ServerImpl(string id, String url, int maxFaults, int minDelay, int maxDelay, String puppetURL, string masterServer)
         {
             this.id = id;
             this.url = url;
@@ -126,7 +126,7 @@ namespace Project
                                 {
                                     foreach (Room r in s.Location.Rooms)
                                     {
-                                        if ((m.SelectedRoom.Name != r.Name || m.Slot.Date != s.Date) && s.Votes >= p.Min_attendees)
+                                        if ((m.SelectedRoom.Name != r.Name || m.Slot.Date != s.Date) && Math.Min(s.Votes, r.Capacity) >= p.Min_attendees)
                                         {
                                             double tempEfficiency = (double)s.Votes / r.Capacity;
                                             if (chosenSlot == null
@@ -146,7 +146,7 @@ namespace Project
                             {
                                 foreach (Room r in s.Location.Rooms)
                                 {
-                                    if (s.Votes >= p.Min_attendees)
+                                    if (Math.Min(s.Votes, r.Capacity) >= p.Min_attendees)
                                     {
                                         double tempEfficiency = (double)s.Votes / r.Capacity;
                                         if (chosenSlot == null 
@@ -209,7 +209,13 @@ namespace Project
                             ClientInterface c = this.Clients[s];
                             c.AddProposal(p);
                         }
-                        this.Clients[coordinator].AddProposal(p);
+                        try
+                        { //in case the coordinator invites himself
+                            this.Clients[coordinator].AddProposal(p);
+                        } catch (ArgumentException e)
+                        {
+                            Console.WriteLine("O utilizador " + coordinator + " convidou-se a si mesmo");
+                        }
                     }
                     else if (n_invitees == 0)
                     {
@@ -366,9 +372,8 @@ namespace Project
 
         private void DoUpdateClient(string serverUrl, string clientUrl, string userName)
         {
-            Console.WriteLine("Sou o servidor e vou fazer update com o user 1" + userName);
             ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
-            Console.WriteLine("Sou o servidor e vou fazer update com o user 2" + userName);
+            Console.WriteLine("Sou o servidor e vou fazer update com o user " + userName);
             si.UpdateClient(clientUrl, userName);
         }
 

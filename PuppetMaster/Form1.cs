@@ -51,7 +51,7 @@ namespace PuppetMaster
             PastCommand.Text += pmi.readCommand(command) + "\r\n";
         }
 
-        //AddRoom
+        //AddRoom FIXME por no readCommand
         private void button2_Click(object sender, EventArgs e)
         {
             string command = CommandBox.Text;
