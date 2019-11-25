@@ -313,11 +313,12 @@ namespace Project
             }
 
             Operation operation = new DoClose(this, userName, topic);
+            AbstractMeeting p = operation.Execute();
             lock (this.Servers)
             {
                 this.Servers[this.url]++;
             }
-            UpdateServers(operation.Execute()); //FIXME
+            UpdateServers(p);
 
             
         }
@@ -325,49 +326,35 @@ namespace Project
         public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
         {
             this.waitBetweenRequests();
-            lock (this.Proposals)
+           
+            Operation operation = new DoCreate(this, coordinator, topic, min_attendees, n_slots, n_invitees, slots, invitees);
+            Proposal p = (Proposal) operation.Execute();
+            lock (this.Servers)
             {
-                lock (this.Clients)
+                this.Servers[this.url]++;
+            }
+            UpdateServers(p);
+            if (n_invitees > 0)
+            {
+                foreach (String s in invitees)
                 {
-                    Dictionary<String, Slot> Slots = new Dictionary<String, Slot>();
-                    foreach (String s in slots)
-                    {
-                        string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
-
-                        Location l = Meetings[zone_date[0]].Location;
-                        Slot slot = new Slot(l, zone_date[1]);
-                        Slots.Add(s, slot);
-                    }
-                    Proposal p = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, Slots, invitees);
-                    Proposals.Add(p.Topic, p);
-                    lock(this.Servers)
-                    {
-                        this.Servers[this.url]++;
-                    }
-                    UpdateServers(p);
-                    if (n_invitees > 0)
-                    {
-                        foreach (String s in invitees)
-                        {
-                            ClientInterface c = this.Clients[s];
-                            c.AddProposal(p);
-                        }
-                        try
-                        { //in case the coordinator invites himself
-                            this.Clients[coordinator].AddProposal(p);
-                        } catch (ArgumentException e)
-                        {
-                            Console.WriteLine("O utilizador " + coordinator + " convidou-se a si mesmo");
-                        }
-                    }
-                    else if (n_invitees == 0)
-                    {
-                        foreach (KeyValuePair<String, ClientInterface> entry in Clients)
-                        {
-                            ClientInterface c = entry.Value;
-                            c.AddProposal(p);
-                        }
-                    }
+                    ClientInterface c = this.Clients[s];
+                    c.AddProposal(p);
+                }
+                try
+                { //in case the coordinator invites himself
+                    this.Clients[coordinator].AddProposal(p);
+                } catch (ArgumentException e)
+                {
+                    Console.WriteLine("O utilizador " + coordinator + " convidou-se a si mesmo");
+                }
+            }
+            else if (n_invitees == 0)
+            {
+                foreach (KeyValuePair<String, ClientInterface> entry in Clients)
+                {
+                    ClientInterface c = entry.Value;
+                    c.AddProposal(p);
                 }
             }
         }
@@ -375,44 +362,14 @@ namespace Project
         public void JoinMeeting(String topic, String userName, List<String> slots)
         {
             this.waitBetweenRequests();
-            lock (this.Proposals)
+
+            Operation operation = new DoJoin(this, topic, userName, slots);
+            Proposal p = (Proposal)operation.Execute();
+            lock (this.Servers)
             {
-                Proposal p = null;
-
-                if(!this.Proposals.TryGetValue(topic, out p))
-                {
-                    Console.WriteLine("O cliente " + userName + " fez join a uma Meeting nao existente");
-                    return;
-                }
-
-                List<Slot> Slots = new List<Slot>();
-                if ((p.N_invitees != 0 && p.Invitees.Contains(userName)) || p.N_invitees == 0 || p.Coordinator == userName)
-                {
-                    foreach (String s in slots)
-                    {
-                        string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
-
-                        Location l = Meetings[zone_date[0]].Location;
-                        Slot slot = new Slot(l, zone_date[1]);
-                        p.Slots[s].Votes += 1;
-                        slot.Votes = p.Slots[s].Votes;
-                        Slots.Add(slot);
-                    }
-
-                    Attendee a = new Attendee(userName, Slots);
-                    p.Version += 1;
-                    p.Attendees.Add(a);
-                    lock (this.Servers)
-                    {
-                        this.Servers[this.url]++;
-                    }
-                    UpdateServers(p);
-                }
-                else
-                {
-                    Console.WriteLine("Sou o/a " + userName + " e estou a dar join a um meeting onde nao estou convidado/a");
-                }
+                this.Servers[this.url]++;
             }
+            UpdateServers(p);
 
         }
 
