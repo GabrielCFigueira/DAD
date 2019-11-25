@@ -40,7 +40,7 @@ namespace Project
         Dictionary<String, ClientInterface> Clients;
         Dictionary<String, Proposal> Proposals;
         Dictionary<String, LocationMeetings> Meetings;
-        List<string> Servers;
+        Dictionary<String, int> Servers;
         
         string id;
         String url;
@@ -64,7 +64,8 @@ namespace Project
             this.Proposals = new Dictionary<String, Proposal>();
             this.Clients = new Dictionary<String, ClientInterface>();
             this.Meetings = new Dictionary<string, LocationMeetings>();
-            this.Servers = new List<string>();
+            this.Servers = new Dictionary<string, int>();
+            this.Servers.Add(url, 0);
 
             this.puppetURL = puppetURL;
             this.masterServer = masterServer;
@@ -105,6 +106,7 @@ namespace Project
                 }
                 lastTicket += 1;
                 Console.WriteLine("Executei o ticket " + lastTicket);
+                Monitor.Pulse(lockTicket);
             }
 
             lock (this.Proposals)
@@ -166,6 +168,10 @@ namespace Project
                         {
                             p.IsCancelled = true;
                             p.Version += 1;
+                            lock (this.Servers)
+                            {
+                                this.Servers[this.url]++;
+                            }
                             UpdateServers(p);
                             return;
                         }
@@ -177,6 +183,10 @@ namespace Project
                         Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, p.Attendees);
                         this.Meetings[chosenSlot.Location.Local].addMeeting(meeting);
                         this.Proposals.Remove(p.Topic);
+                        lock (this.Servers)
+                        {
+                            this.Servers[this.url]++;
+                        }
                         UpdateServers(meeting);
                     }
                 }
@@ -201,6 +211,10 @@ namespace Project
                     }
                     Proposal p = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, Slots, invitees);
                     Proposals.Add(p.Topic, p);
+                    lock(this.Servers)
+                    {
+                        this.Servers[this.url]++;
+                    }
                     UpdateServers(p);
                     if (n_invitees > 0)
                     {
@@ -234,7 +248,14 @@ namespace Project
             this.waitBetweenRequests();
             lock (this.Proposals)
             {
-                Proposal p = this.Proposals[topic];
+                Proposal p = null;
+
+                if(!this.Proposals.TryGetValue(topic, out p))
+                {
+                    Console.WriteLine("O cliente " + userName + " fez join a uma Meeting nao existente");
+                    return;
+                }
+
                 List<Slot> Slots = new List<Slot>();
                 if ((p.N_invitees != 0 && p.Invitees.Contains(userName)) || p.N_invitees == 0 || p.Coordinator == userName)
                 {
@@ -247,12 +268,15 @@ namespace Project
                         p.Slots[s].Votes += 1;
                         slot.Votes = p.Slots[s].Votes;
                         Slots.Add(slot);
-
                     }
 
                     Attendee a = new Attendee(userName, Slots);
                     p.Version += 1;
                     p.Attendees.Add(a);
+                    lock (this.Servers)
+                    {
+                        this.Servers[this.url]++;
+                    }
                     UpdateServers(p);
                 }
                 else
@@ -331,13 +355,17 @@ namespace Project
         {
             lock (this.Servers)
             {
-                Thread[] pool = new Thread[this.Servers.Count];
-                for (int i = 0; i < this.Servers.Count; i++)
+                Thread[] pool = new Thread[this.Servers.Count - 1];
+                int i = 0;
+                foreach(KeyValuePair<String, int> entry in this.Servers)
                 {
-                    string url = this.Servers[i];
-                    pool[i] = new Thread(() => DoUpdate(url, absMeeting));
-                    pool[i].Start();
-                    //DoUpdate(url, absMeeting);
+                    if (this.url != entry.Key)
+                    {
+                        string url = entry.Key;
+                        pool[i] = new Thread(() => DoUpdate(url, absMeeting));
+                        pool[i].Start();
+                        i++;
+                    }
                 }
             }
         }
@@ -345,7 +373,7 @@ namespace Project
         private void DoUpdate(string url, AbstractMeeting absMeeting)
         {
             ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-            si.UpdateMeeting(absMeeting);
+            si.UpdateMeeting(absMeeting, this.url, this.Servers);
         }
 
         public void UpdateServersClients(String clientUrl, String userName)
@@ -353,20 +381,18 @@ namespace Project
             lock (this.Servers)
             {
 
-                Thread[] pool = new Thread[this.Servers.Count];
-                for (int i = 0; i < this.Servers.Count; i++)
+                Thread[] pool = new Thread[this.Servers.Count - 1];
+                int i = 0;
+                foreach (KeyValuePair<String, int> entry in this.Servers)
                 {
-                    string url = this.Servers[i];
-                    pool[i] = new Thread(() => DoUpdateClient(url, clientUrl, userName));
-                    pool[i].Start();
-                    //DoUpdateClient(url, clientUrl, userName);
-            }
-
-                /*for (int i = 0; i < this.Servers.Count; i++)
-                {
-                    pool[i].Join();
-                }*/
-
+                    if(entry.Key != this.url)
+                    {
+                        string url = entry.Key;
+                        pool[i] = new Thread(() => DoUpdateClient(url, clientUrl, userName));
+                        pool[i].Start();
+                        i++;
+                    }
+                }
             }
         }
 
@@ -390,8 +416,23 @@ namespace Project
             }
         }
 
-        public void UpdateMeeting(AbstractMeeting absMeeting)
+        public void UpdateMeeting(AbstractMeeting absMeeting, string serverURL, Dictionary<string, int> vectorClock)
         {
+            lock(this.Servers)
+            {
+                Console.WriteLine("Server's own clock");
+                printClock(this.Servers);
+                Console.WriteLine("Received Clock");
+                printClock(vectorClock);
+                while(!checkClock(serverURL, vectorClock))
+                {
+                    Monitor.Wait(this.Servers);
+                }
+
+                this.Servers[serverURL]++;
+
+                Monitor.Pulse(this.Servers);
+            }
             lock (this.Proposals)
             {
                 lock (this.Meetings)
@@ -424,11 +465,36 @@ namespace Project
             
         }
 
+        private bool checkClock(string serverURL, Dictionary<string, int> vectorClock)
+        {
+            
+            foreach (KeyValuePair<string, int> entry in this.Servers)
+            {
+                if (serverURL != entry.Key && entry.Value < vectorClock[entry.Key])
+                {
+                    return false;
+                }
+                else if (serverURL == entry.Key && entry.Value != vectorClock[entry.Key] - 1)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private void printClock(Dictionary<string, int> vectorClock)
+        {
+            foreach (KeyValuePair<string, int> entry in vectorClock)
+            {
+                Console.WriteLine("Server: " + entry.Key + " Clock: " + entry.Value);
+            }
+        }
+
         public void AddServer(String serverURL)
         {
             lock (this.Servers)
             {
-                this.Servers.Add(serverURL);
+                this.Servers.Add(serverURL, 0);
             }
         }
 
@@ -456,9 +522,9 @@ namespace Project
             Console.WriteLine("Servers that are alive: ");
             if (Servers.Count != 0) 
             {
-                foreach (string s in Servers)
+                foreach (KeyValuePair<String, int> entry in this.Servers)
                 {
-                    Console.WriteLine("Server: " + s);
+                    Console.WriteLine("Server: " + entry.Key);
                 }
             } else { Console.WriteLine("No Servers Available"); }
 
