@@ -35,13 +35,15 @@ namespace Project
         }
     }
 
+
     class ServerImpl : MarshalByRefObject, ServerInterface, IServerPuppet
     {
+
         Dictionary<String, ClientInterface> Clients;
         Dictionary<String, Proposal> Proposals;
         Dictionary<String, LocationMeetings> Meetings;
         Dictionary<String, int> Servers;
-        
+
         string id;
         String url;
         int maxFaults;
@@ -53,6 +55,207 @@ namespace Project
         String lockTicket = "";
         Int32 ticket = 0;
         Int32 lastTicket = 0;
+
+        private abstract class Operation
+        {
+            public abstract AbstractMeeting Execute();
+        }
+
+        private class DoCreate : Operation
+        {
+            ServerImpl server;
+            string coordinator;
+            string topic;
+            int min_attendees;
+            int n_slots;
+            int n_invitees;
+            List<String> slots;
+            List<String> invitees;
+
+            public DoCreate(ServerImpl server, string coordinator, string topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
+            {
+                this.server = server;
+                this.coordinator = coordinator;
+                this.topic = topic;
+                this.min_attendees = min_attendees;
+                this.n_slots = n_slots;
+                this.n_invitees = n_invitees;
+                this.slots = slots;
+                this.invitees = invitees;
+            }
+
+            override public AbstractMeeting Execute()
+            {
+                lock (server.Proposals)
+                {
+                    lock (server.Clients)
+                    {
+                        Dictionary<String, Slot> Slots = new Dictionary<String, Slot>();
+                        foreach (String s in slots)
+                        {
+                            string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
+
+                            Location l = server.Meetings[zone_date[0]].Location;
+                            Slot slot = new Slot(l, zone_date[1]);
+                            Slots.Add(s, slot);
+                        }
+                        Proposal p = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, Slots, invitees);
+                        server.Proposals.Add(p.Topic, p);
+
+                        return p;
+                    }
+                }
+            }
+        }
+
+        private class DoJoin : Operation
+        {
+            ServerImpl server;
+            string topic;
+            string userName;
+            List<string> slots;
+            public DoJoin(ServerImpl server, string topic, string userName, List<string> slots)
+            {
+                this.server = server;
+                this.topic = topic;
+                this.userName = userName;
+                this.slots = slots;
+            }
+
+            override public AbstractMeeting Execute()
+            {
+                lock (server.Proposals)
+                {
+                    Proposal p = null;
+
+                    if (!server.Proposals.TryGetValue(topic, out p))
+                    {
+                        Console.WriteLine("O cliente " + userName + " fez join a uma Meeting nao existente");
+                        return p;
+                    }
+
+                    List<Slot> Slots = new List<Slot>();
+                    if ((p.N_invitees != 0 && p.Invitees.Contains(userName)) || p.N_invitees == 0 || p.Coordinator == userName)
+                    {
+                        foreach (String s in slots)
+                        {
+                            string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
+
+                            Location l = server.Meetings[zone_date[0]].Location;
+                            Slot slot = new Slot(l, zone_date[1]);
+                            p.Slots[s].Votes += 1;
+                            slot.Votes = p.Slots[s].Votes;
+                            Slots.Add(slot);
+                        }
+
+                        Attendee a = new Attendee(userName, Slots);
+                        p.Version += 1;
+                        p.Attendees.Add(a);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Sou o/a " + userName + " e estou a dar join a um meeting onde nao estou convidado/a");
+                    }
+
+                    return p;
+
+                }
+            }
+        }
+
+        private class DoClose : Operation
+        {
+            ServerImpl server;
+            string topic;
+            string userName;
+
+            public DoClose(ServerImpl server, String userName, String topic)
+            {
+                this.server = server;
+                this.topic = topic;
+                this.userName = userName;
+            }
+
+            override public AbstractMeeting Execute()
+            {
+                lock (server.Proposals)
+                {
+                    lock (server.Meetings)
+                    {
+                        Proposal p = server.Proposals[topic];
+                        Slot chosenSlot = null;
+                        Room selectedRoom = null;
+                        double efficiency = 0;
+                        if (p.Coordinator == userName)
+                        {
+                            foreach (Slot s in p.Slots.Values)
+                            {
+                                List<Meeting> meetings = server.Meetings[s.Location.Local].Meetings;
+                                if (meetings.Count != 0)
+                                {
+                                    foreach (Meeting m in meetings)
+                                    {
+                                        foreach (Room r in s.Location.Rooms)
+                                        {
+                                            if ((m.SelectedRoom.Name != r.Name || m.Slot.Date != s.Date) && Math.Min(s.Votes, r.Capacity) >= p.Min_attendees)
+                                            {
+                                                double tempEfficiency = (double)s.Votes / r.Capacity;
+                                                if (chosenSlot == null
+                                                || Math.Min(chosenSlot.Votes, selectedRoom.Capacity) < Math.Min(s.Votes, r.Capacity)
+                                                || (Math.Min(chosenSlot.Votes, selectedRoom.Capacity) == Math.Min(s.Votes, r.Capacity)
+                                                && tempEfficiency > efficiency))
+                                                {
+                                                    chosenSlot = s;
+                                                    selectedRoom = r;
+                                                    efficiency = tempEfficiency;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    foreach (Room r in s.Location.Rooms)
+                                    {
+                                        if (Math.Min(s.Votes, r.Capacity) >= p.Min_attendees)
+                                        {
+                                            double tempEfficiency = (double)s.Votes / r.Capacity;
+                                            if (chosenSlot == null
+                                                || Math.Min(chosenSlot.Votes, selectedRoom.Capacity) < Math.Min(s.Votes, r.Capacity)
+                                                || (Math.Min(chosenSlot.Votes, selectedRoom.Capacity) == Math.Min(s.Votes, r.Capacity)
+                                                && tempEfficiency > efficiency))
+                                            {
+                                                chosenSlot = s;
+                                                selectedRoom = r;
+                                                efficiency = tempEfficiency;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if (chosenSlot == null)
+                            {
+                                p.IsCancelled = true;
+                                p.Version += 1;
+                                return p;
+                            }
+                            while (p.Attendees.Count > selectedRoom.Capacity)
+                            {
+                                p.Attendees.RemoveAt(p.Attendees.Count - 1);
+                            }
+
+                            Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, p.Attendees);
+                            server.Meetings[chosenSlot.Location.Local].addMeeting(meeting);
+                            server.Proposals.Remove(p.Topic);
+
+                            return meeting;
+                        }
+
+                        return p;
+                    }
+                }
+            }
+        }
 
         public ServerImpl(string id, String url, int maxFaults, int minDelay, int maxDelay, String puppetURL, string masterServer)
         {
@@ -109,88 +312,14 @@ namespace Project
                 Monitor.Pulse(lockTicket);
             }
 
-            lock (this.Proposals)
+            Operation operation = new DoClose(this, userName, topic);
+            lock (this.Servers)
             {
-                lock (this.Meetings)
-                {
-                    Proposal p = this.Proposals[topic];
-                    Slot chosenSlot = null;
-                    Room selectedRoom = null;
-                    double efficiency = 0;
-                    if (p.Coordinator == userName)
-                    {
-                        foreach (Slot s in p.Slots.Values)
-                        {
-                            List<Meeting> meetings = this.Meetings[s.Location.Local].Meetings;
-                            if (meetings.Count != 0)
-                            {
-                                foreach (Meeting m in meetings)
-                                {
-                                    foreach (Room r in s.Location.Rooms)
-                                    {
-                                        if ((m.SelectedRoom.Name != r.Name || m.Slot.Date != s.Date) && Math.Min(s.Votes, r.Capacity) >= p.Min_attendees)
-                                        {
-                                            double tempEfficiency = (double)s.Votes / r.Capacity;
-                                            if (chosenSlot == null
-                                            || Math.Min(chosenSlot.Votes, selectedRoom.Capacity) < Math.Min(s.Votes, r.Capacity)
-                                            || (Math.Min(chosenSlot.Votes, selectedRoom.Capacity) == Math.Min(s.Votes, r.Capacity)
-                                            && tempEfficiency > efficiency))
-                                            {
-                                                chosenSlot = s;
-                                                selectedRoom = r;
-                                                efficiency = tempEfficiency;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                foreach (Room r in s.Location.Rooms)
-                                {
-                                    if (Math.Min(s.Votes, r.Capacity) >= p.Min_attendees)
-                                    {
-                                        double tempEfficiency = (double)s.Votes / r.Capacity;
-                                        if (chosenSlot == null 
-                                            || Math.Min(chosenSlot.Votes, selectedRoom.Capacity) < Math.Min(s.Votes, r.Capacity)
-                                            || (Math.Min(chosenSlot.Votes, selectedRoom.Capacity) == Math.Min(s.Votes, r.Capacity) 
-                                            && tempEfficiency > efficiency))
-                                        {
-                                            chosenSlot = s;
-                                            selectedRoom = r;
-                                            efficiency = tempEfficiency;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        if (chosenSlot == null)
-                        {
-                            p.IsCancelled = true;
-                            p.Version += 1;
-                            lock (this.Servers)
-                            {
-                                this.Servers[this.url]++;
-                            }
-                            UpdateServers(p);
-                            return;
-                        }
-                        while (p.Attendees.Count > selectedRoom.Capacity)
-                        {
-                            p.Attendees.RemoveAt(p.Attendees.Count - 1);
-                        }
-
-                        Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, p.Attendees);
-                        this.Meetings[chosenSlot.Location.Local].addMeeting(meeting);
-                        this.Proposals.Remove(p.Topic);
-                        lock (this.Servers)
-                        {
-                            this.Servers[this.url]++;
-                        }
-                        UpdateServers(meeting);
-                    }
-                }
+                this.Servers[this.url]++;
             }
+            UpdateServers(operation.Execute()); //FIXME
+
+            
         }
 
         public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
