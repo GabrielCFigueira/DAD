@@ -56,14 +56,9 @@ namespace Project
         Int32 ticket = 0;
         Int32 lastTicket = 0;
 
-        private abstract class Operation
+        [Serializable]
+        private class DoCreate : Command
         {
-            public abstract AbstractMeeting Execute();
-        }
-
-        private class DoCreate : Operation
-        {
-            ServerImpl server;
             string coordinator;
             string topic;
             int min_attendees;
@@ -72,9 +67,8 @@ namespace Project
             List<String> slots;
             List<String> invitees;
 
-            public DoCreate(ServerImpl server, string coordinator, string topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
+            public DoCreate(string coordinator, string topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
             {
-                this.server = server;
                 this.coordinator = coordinator;
                 this.topic = topic;
                 this.min_attendees = min_attendees;
@@ -84,8 +78,9 @@ namespace Project
                 this.invitees = invitees;
             }
 
-            override public AbstractMeeting Execute()
+            override public AbstractMeeting Execute(ServerInterface si)
             {
+                ServerImpl server = (ServerImpl)si;
                 lock (server.Proposals)
                 {
                     lock (server.Clients)
@@ -108,22 +103,22 @@ namespace Project
             }
         }
 
-        private class DoJoin : Operation
+        [Serializable]
+        private class DoJoin : Command
         {
-            ServerImpl server;
             string topic;
             string userName;
             List<string> slots;
-            public DoJoin(ServerImpl server, string topic, string userName, List<string> slots)
+            public DoJoin(string topic, string userName, List<string> slots)
             {
-                this.server = server;
                 this.topic = topic;
                 this.userName = userName;
                 this.slots = slots;
             }
 
-            override public AbstractMeeting Execute()
+            override public AbstractMeeting Execute(ServerInterface si)
             {
+                ServerImpl server = (ServerImpl)si;
                 lock (server.Proposals)
                 {
                     Proposal p = null;
@@ -163,21 +158,21 @@ namespace Project
             }
         }
 
-        private class DoClose : Operation
+        [Serializable]
+        private class DoClose : Command
         {
-            ServerImpl server;
             string topic;
             string userName;
 
-            public DoClose(ServerImpl server, String userName, String topic)
+            public DoClose(String userName, String topic)
             {
-                this.server = server;
                 this.topic = topic;
                 this.userName = userName;
             }
 
-            override public AbstractMeeting Execute()
+            override public AbstractMeeting Execute(ServerInterface si)
             {
+                ServerImpl server = (ServerImpl)si;
                 lock (server.Proposals)
                 {
                     lock (server.Meetings)
@@ -237,21 +232,40 @@ namespace Project
                             {
                                 p.IsCancelled = true;
                                 p.Version += 1;
+                                lock(server.lockTicket)
+                                {
+                                    server.lastTicket++;
+                                }
                                 return p;
                             }
-                            while (p.Attendees.Count > selectedRoom.Capacity)
+                            else
                             {
-                                p.Attendees.RemoveAt(p.Attendees.Count - 1);
+                                while (p.Attendees.Count > selectedRoom.Capacity)
+                                {
+                                    p.Attendees.RemoveAt(p.Attendees.Count - 1);
+                                }
+
+                                Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, p.Attendees);
+                                server.Meetings[chosenSlot.Location.Local].addMeeting(meeting);
+                                server.Proposals.Remove(p.Topic);
+
+                                lock (server.lockTicket)
+                                {
+                                    server.lastTicket++;
+                                }
+
+                                return meeting;
                             }
-
-                            Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, p.Attendees);
-                            server.Meetings[chosenSlot.Location.Local].addMeeting(meeting);
-                            server.Proposals.Remove(p.Topic);
-
-                            return meeting;
+                        }
+                        else
+                        {
+                            lock (server.lockTicket)
+                            {
+                                server.lastTicket++;
+                            }
+                            throw new Exception(); //coordinator must be the one closing
                         }
 
-                        return p;
                     }
                 }
             }
@@ -307,18 +321,15 @@ namespace Project
                 {
                     Monitor.Wait(lockTicket);
                 }
-                lastTicket += 1;
-                Console.WriteLine("Executei o ticket " + lastTicket);
-                Monitor.Pulse(lockTicket);
             }
 
-            Operation operation = new DoClose(this, userName, topic);
-            AbstractMeeting p = operation.Execute();
+            Command command = new DoClose(userName, topic);
+            command.Execute(this);
             lock (this.Servers)
             {
                 this.Servers[this.url]++;
             }
-            UpdateServers(p);
+            UpdateServers(command);
 
             
         }
@@ -327,13 +338,13 @@ namespace Project
         {
             this.waitBetweenRequests();
            
-            Operation operation = new DoCreate(this, coordinator, topic, min_attendees, n_slots, n_invitees, slots, invitees);
-            Proposal p = (Proposal) operation.Execute();
+            Command command = new DoCreate(coordinator, topic, min_attendees, n_slots, n_invitees, slots, invitees);
+            Proposal p = (Proposal) command.Execute(this);
             lock (this.Servers)
             {
                 this.Servers[this.url]++;
             }
-            UpdateServers(p);
+            UpdateServers(command);
             if (n_invitees > 0)
             {
                 foreach (String s in invitees)
@@ -363,13 +374,13 @@ namespace Project
         {
             this.waitBetweenRequests();
 
-            Operation operation = new DoJoin(this, topic, userName, slots);
-            Proposal p = (Proposal)operation.Execute();
+            Command command = new DoJoin(topic, userName, slots);
+            command.Execute(this);
             lock (this.Servers)
             {
                 this.Servers[this.url]++;
             }
-            UpdateServers(p);
+            UpdateServers(command);
 
         }
 
@@ -437,7 +448,7 @@ namespace Project
             file.Close();
         }
 
-        public void UpdateServers(AbstractMeeting absMeeting)
+        public void UpdateServers(Command command)
         {
             lock (this.Servers)
             {
@@ -448,7 +459,7 @@ namespace Project
                     if (this.url != entry.Key)
                     {
                         string url = entry.Key;
-                        pool[i] = new Thread(() => DoUpdate(url, absMeeting));
+                        pool[i] = new Thread(() => DoUpdate(url, command));
                         pool[i].Start();
                         i++;
                     }
@@ -456,10 +467,10 @@ namespace Project
             }
         }
 
-        private void DoUpdate(string url, AbstractMeeting absMeeting)
+        private void DoUpdate(string url, Command command)
         {
             ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-            si.UpdateMeeting(absMeeting, this.url, this.Servers);
+            si.UpdateMeeting(command, this.url, this.Servers);
         }
 
         public void UpdateServersClients(String clientUrl, String userName)
@@ -502,7 +513,7 @@ namespace Project
             }
         }
 
-        public void UpdateMeeting(AbstractMeeting absMeeting, string serverURL, Dictionary<string, int> vectorClock)
+        public void UpdateMeeting(Command command, string serverURL, Dictionary<string, int> vectorClock)
         {
             lock(this.Servers)
             {
@@ -519,35 +530,7 @@ namespace Project
 
                 Monitor.Pulse(this.Servers);
             }
-            lock (this.Proposals)
-            {
-                lock (this.Meetings)
-                {
-                    if (absMeeting.isProposal())
-                    {
-                        this.Proposals[absMeeting.Topic] = (Proposal)absMeeting;
-                        if(((Proposal) absMeeting).IsCancelled)
-                        {
-                            lock(lockTicket)
-                            {
-                                lastTicket += 1;
-                                Console.WriteLine("Executei o ticket " + lastTicket);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        lock(lockTicket)
-                        {
-                            lastTicket += 1;
-                            Console.WriteLine("Executei o ticket " + lastTicket);
-                        }
-                        Meeting m = (Meeting)absMeeting;
-                        this.Proposals.Remove(absMeeting.Topic);
-                        this.Meetings[m.Slot.Location.Local].addMeeting(m);
-                    }
-                }
-            }
+            command.Execute(this);
             
         }
 
