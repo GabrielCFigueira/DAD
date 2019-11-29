@@ -1,7 +1,1 @@
-wait 4000
-list
-create Bolacha 1 2 2 Porto,16-05-19 Braga,18-05-19 Ze Maria
-join Bolacha 1 Braga,18-05-19
-wait 2500
-close Bolacha
 list

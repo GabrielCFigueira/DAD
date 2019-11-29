@@ -40,6 +40,7 @@ namespace Project
     {
 
         Dictionary<String, ClientInterface> Clients;
+        Dictionary<String, String> ClientsURLS;
         Dictionary<String, Proposal> Proposals;
         Dictionary<String, LocationMeetings> Meetings;
         Dictionary<String, int> Servers;
@@ -281,6 +282,7 @@ namespace Project
             this.Proposals = new Dictionary<String, Proposal>();
             this.Clients = new Dictionary<String, ClientInterface>();
             this.Meetings = new Dictionary<string, LocationMeetings>();
+            this.ClientsURLS = new Dictionary<String, String>();
             this.Servers = new Dictionary<string, int>();
             this.Servers.Add(url, 0);
 
@@ -345,7 +347,10 @@ namespace Project
                 this.Servers[this.url]++;
             }
             UpdateServers(command);
-            if (n_invitees > 0)
+            ClientInterface c = this.Clients[coordinator];
+            //c.AddProposal(p);
+            c.Gossip(p);
+            /*if (n_invitees > 0)
             {
                 foreach (String s in invitees)
                 {
@@ -367,7 +372,7 @@ namespace Project
                     ClientInterface c = entry.Value;
                     c.AddProposal(p);
                 }
-            }
+            }*/
         }
 
         public void JoinMeeting(String topic, String userName, List<String> slots)
@@ -405,10 +410,22 @@ namespace Project
             c.Connect(this.url);
             lock (this.Clients)
             {
-                Clients.Add(userName, c);
+                lock (this.ClientsURLS)
+                {
+                    Clients.Add(userName, c);
+                    ClientsURLS.Add(userName, client_URL);
+
+                    foreach (KeyValuePair<String, ClientInterface> entry in this.Clients)
+                    {
+                        ClientInterface ci = entry.Value;
+                        //ci.UpdateUsers(this.Clients);
+                        ci.UpdateUsers(this.ClientsURLS);
+                    }
+                }
             }
             this.UpdateServersClients(client_URL, userName);
             Console.WriteLine("Registei o/a cliente " + userName);
+
 
         }
 

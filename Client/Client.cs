@@ -89,16 +89,19 @@ namespace Project
         }
     }
 
+
     class ClientImpl : MarshalByRefObject, ClientInterface
     {
         String UserName;
         ServerInterface Server;
         Dictionary<String, AbstractMeeting> Meetings;
+        Dictionary<String, String> Clients;
 
         public ClientImpl(String userName)
         {
             this.UserName = userName;
             this.Meetings = new Dictionary<string, AbstractMeeting>();
+            this.Clients = new Dictionary<String, String>();
         }
 
         public override object InitializeLifetimeService()
@@ -187,7 +190,13 @@ namespace Project
             Server = (ServerInterface)Activator.GetObject(
                 typeof(ServerInterface),
                 server_URL);
+            //this.Clients = clients; //Cada cliente recebe a lista de todos os clientes existentes no sistema quando se conectam
             Console.WriteLine("Registei o servidor. Sou o/a " + this.UserName);
+        }
+
+        public void UpdateUsers(Dictionary<String, String> clients)
+        {
+            this.Clients = clients;
         }
 
         public void PrintAllMeetings(string meetings)
@@ -198,6 +207,70 @@ namespace Project
         public void AddProposal(Proposal p)
         {
             this.Meetings.Add(p.Topic, p);
+        }
+
+        public void Gossip(Proposal p)
+        {
+            Console.WriteLine("Comecei o Gossip");
+            AbstractMeeting am = (AbstractMeeting) p;
+            //if(this.UserName == am.Coordinator)
+            //    this.Meetings.Remove(am.Topic); //martelado, para nao haver loops
+            //String my_url = this.Clients[this.UserName];
+            //this.Clients.Remove(this.UserName); //nao queremos mandar mensagens para nos proprios
+            //if(am.Coordinator != this.UserName)
+            //    this.Clients.Remove(am.Coordinator); //nao queremos mandar mensagens para o coordinator
+            Dictionary<String, String> clientsToSend = new Dictionary<String, String>();
+            foreach(KeyValuePair<String, String> entry in this.Clients)
+            {
+                clientsToSend[entry.Key] = entry.Value;
+            }
+
+            if (this.Meetings.ContainsKey(am.Topic))
+            {
+                Console.WriteLine("Ja tenho o proposal. Vou embora");    
+                return;
+            }
+
+            if(!this.Meetings.ContainsValue(am) && am.N_invitees == 0)
+            {
+                Console.WriteLine("Este proposal é aberta, sou o/a " + this.UserName + " e passei a conhecer a meeting com o Topic " + am.Topic);
+                this.Meetings.Add(am.Topic, am);
+            } 
+            else if(!this.Meetings.ContainsValue(am) && am.N_invitees != 0 && am.Invitees.Contains(this.UserName))
+            {
+                Console.WriteLine("Este proposal é fechada e sou convidado/a, sou o/a " + this.UserName + " e passei a conhecer a meeting com o Topic " + am.Topic);
+                this.Meetings.Add(am.Topic, am);
+            }
+
+            List<String> listClientNames = this.Clients.Keys.ToList();
+            int numberOfMessages = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2));
+            if (numberOfMessages == 0) //means theres 2 clients
+                numberOfMessages = 1;
+            else if (numberOfMessages < 0) //means theres only one client
+                numberOfMessages = 0;
+            Console.WriteLine("Vou mandar " + numberOfMessages + " mensagens");
+            for(int i = 0; i < numberOfMessages; i++)
+            {
+                String chosenClientName = getRandomClientName(clientsToSend);
+                while (chosenClientName == this.UserName)
+                {
+                    chosenClientName = getRandomClientName(clientsToSend);
+                }
+                clientsToSend.Remove(chosenClientName);
+                //this.Clients.Add(this.UserName,my_url);
+                Console.WriteLine("Mandei ao/a " + chosenClientName);
+                ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), this.Clients[chosenClientName]);
+                chosenClient.Gossip(p);
+            }
+        }
+
+        public String getRandomClientName(Dictionary<String,String> clientsToSend)
+        {
+            List<String> listClientNames = clientsToSend.Keys.ToList();
+            Random random = new Random();
+            int randomIndex = random.Next(listClientNames.Count);
+            String chosenClientName = listClientNames[randomIndex];
+            return chosenClientName;
         }
 
         public void UpdateMeetings(Dictionary<string, Proposal> proposals, Dictionary<string, LocationMeetings> meetings)

@@ -23,6 +23,10 @@ namespace Project
 
         void UpdateMeetings(Dictionary<String, Proposal> proposals, Dictionary<string, LocationMeetings> meetings);
 
+        void Gossip(Proposal p);
+
+        void UpdateUsers(Dictionary<String,String> clients);
+
     }
 
     public interface ServerInterface
