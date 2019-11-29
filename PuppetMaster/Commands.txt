@@ -5,7 +5,7 @@ Client Maria tcp://localhost:8100/MeetingClient tcp://localhost:8081/MeetingServ
 Client Joao tcp://localhost:8101/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsJoao.txt
 Client Ze tcp://localhost:8102/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsZe.txt
 Client Pedro tcp://localhost:8103/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
-Client Andre tcp://localhost:8104/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
-Client Julia tcp://localhost:8105/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
-Client Yolanda tcp://localhost:8106/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
-Client Catarina tcp://localhost:8107/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Andre tcp://localhost:8104/MeetingClient tcp://localhost:8082/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Julia tcp://localhost:8105/MeetingClient tcp://localhost:8082/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Yolanda tcp://localhost:8106/MeetingClient tcp://localhost:8082/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Catarina tcp://localhost:8107/MeetingClient tcp://localhost:8082/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt

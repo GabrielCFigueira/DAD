@@ -190,7 +190,6 @@ namespace Project
             Server = (ServerInterface)Activator.GetObject(
                 typeof(ServerInterface),
                 server_URL);
-            //this.Clients = clients; //Cada cliente recebe a lista de todos os clientes existentes no sistema quando se conectam
             Console.WriteLine("Registei o servidor. Sou o/a " + this.UserName);
         }
 
@@ -212,13 +211,11 @@ namespace Project
         public void Gossip(Proposal p)
         {
             Console.WriteLine("Comecei o Gossip");
+            foreach(KeyValuePair<String, String> entry in this.Clients)
+            {
+                Console.WriteLine(entry.Value);
+            }
             AbstractMeeting am = (AbstractMeeting) p;
-            //if(this.UserName == am.Coordinator)
-            //    this.Meetings.Remove(am.Topic); //martelado, para nao haver loops
-            //String my_url = this.Clients[this.UserName];
-            //this.Clients.Remove(this.UserName); //nao queremos mandar mensagens para nos proprios
-            //if(am.Coordinator != this.UserName)
-            //    this.Clients.Remove(am.Coordinator); //nao queremos mandar mensagens para o coordinator
             Dictionary<String, String> clientsToSend = new Dictionary<String, String>();
             foreach(KeyValuePair<String, String> entry in this.Clients)
             {
@@ -242,8 +239,8 @@ namespace Project
                 this.Meetings.Add(am.Topic, am);
             }
 
-            List<String> listClientNames = this.Clients.Keys.ToList();
-            int numberOfMessages = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2));
+            //List<String> listClientNames = this.Clients.Keys.ToList();
+            int numberOfMessages = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2)); //verificar condicao melhor de propagacao
             if (numberOfMessages == 0) //means theres 2 clients
                 numberOfMessages = 1;
             else if (numberOfMessages < 0) //means theres only one client
@@ -257,10 +254,9 @@ namespace Project
                     chosenClientName = getRandomClientName(clientsToSend);
                 }
                 clientsToSend.Remove(chosenClientName);
-                //this.Clients.Add(this.UserName,my_url);
                 Console.WriteLine("Mandei ao/a " + chosenClientName);
                 ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), this.Clients[chosenClientName]);
-                chosenClient.Gossip(p);
+                chosenClient.Gossip(p); //mudar para chamada assincrona
             }
         }
 

@@ -404,6 +404,7 @@ namespace Project
 
         public void Connect(string client_URL, string userName)
         {
+            this.UpdateServersClients(client_URL, userName); // rever isto
             ClientInterface c = (ClientInterface)Activator.GetObject(
                  typeof(ClientInterface),
                  client_URL);
@@ -423,7 +424,6 @@ namespace Project
                     }
                 }
             }
-            this.UpdateServersClients(client_URL, userName);
             Console.WriteLine("Registei o/a cliente " + userName);
 
 
@@ -513,7 +513,7 @@ namespace Project
         private void DoUpdateClient(string serverUrl, string clientUrl, string userName)
         {
             ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
-            Console.WriteLine("Sou o servidor e vou fazer update com o user " + userName);
+            Console.WriteLine("Sou o servidor " + this.id + " e vou fazer update com o user " + userName);
             si.UpdateClient(clientUrl, userName);
         }
 
@@ -526,6 +526,7 @@ namespace Project
                 {
                     Console.WriteLine("Passei a conhecer o user " + userName);
                     this.Clients[userName] = ci;
+                    this.ClientsURLS[userName] = client_url; //rever isto
                 }
             }
         }
