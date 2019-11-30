@@ -56,9 +56,17 @@ namespace Project
         Int32 ticket = 0;
         Int32 lastTicket = 0;
 
+        //Reliable BroadCast structures
+        int msg_id;
+        Dictionary<int, List<string>> acks; //Key: topic, values: list of servers
+        List<int> received_commands; //Every command has a topic  -> I think this can be the list of the keys of acks
+        List<int> delivered_commands; //Try to find a way that this is my list of abstractMeetings
+
+
         [Serializable]
         private class DoCreate : Command
         {
+            int command_id;
             string coordinator;
             string topic;
             int min_attendees;
@@ -67,7 +75,7 @@ namespace Project
             List<String> slots;
             List<String> invitees;
 
-            public DoCreate(string coordinator, string topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
+            public DoCreate(string coordinator, string topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees, int msg_id)
             {
                 this.coordinator = coordinator;
                 this.topic = topic;
@@ -76,6 +84,7 @@ namespace Project
                 this.n_invitees = n_invitees;
                 this.slots = slots;
                 this.invitees = invitees;
+                this.command_id = msg_id;
             }
 
             override public AbstractMeeting Execute(ServerInterface si)
@@ -101,19 +110,26 @@ namespace Project
                     }
                 }
             }
+
+            override public int getCommandId()
+            {
+                return this.command_id;
+            }
         }
 
         [Serializable]
         private class DoJoin : Command
         {
+            int command_id;
             string topic;
             string userName;
             List<string> slots;
-            public DoJoin(string topic, string userName, List<string> slots)
+            public DoJoin(string topic, string userName, List<string> slots, int msg_id)
             {
                 this.topic = topic;
                 this.userName = userName;
                 this.slots = slots;
+                this.command_id = msg_id;
             }
 
             override public AbstractMeeting Execute(ServerInterface si)
@@ -156,18 +172,25 @@ namespace Project
 
                 }
             }
+
+            override public int getCommandId()
+            {
+                return this.command_id;
+            }
         }
 
         [Serializable]
         private class DoClose : Command
         {
+            int command_id;
             string topic;
             string userName;
 
-            public DoClose(String userName, String topic)
+            public DoClose(String userName, String topic, int msg_id)
             {
                 this.topic = topic;
                 this.userName = userName;
+                this.command_id = msg_id;
             }
 
             override public AbstractMeeting Execute(ServerInterface si)
@@ -269,6 +292,11 @@ namespace Project
                     }
                 }
             }
+
+            override public int getCommandId()
+            {
+                return this.command_id;
+            }
         }
 
         public ServerImpl(string id, String url, int maxFaults, int minDelay, int maxDelay, String puppetURL, string masterServer)
@@ -286,6 +314,13 @@ namespace Project
 
             this.puppetURL = puppetURL;
             this.masterServer = masterServer;
+
+            //RB
+            this.msg_id = 0;
+            this.acks = new Dictionary<int, List<string>>();
+            this.received_commands = new List<int>();
+            this.delivered_commands = new List<int>();
+;
         }
 
         public override object InitializeLifetimeService()
@@ -322,12 +357,18 @@ namespace Project
                     Monitor.Wait(lockTicket);
                 }
             }
-
-            Command command = new DoClose(userName, topic);
+            setMsgId();
+            Command command = new DoClose(userName, topic, getMsgId());
             command.Execute(this);
             lock (this.Servers)
             {
                 this.Servers[this.url]++;
+            }
+            //Before updateServers (reliable broadcast)
+            //Say that I already received my command
+            lock (received_commands)
+            {
+                received_commands.Add(command.getCommandId());
             }
             UpdateServers(command);
 
@@ -337,12 +378,19 @@ namespace Project
         public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
         {
             this.waitBetweenRequests();
-           
-            Command command = new DoCreate(coordinator, topic, min_attendees, n_slots, n_invitees, slots, invitees);
+            setMsgId();
+            //Console.WriteLine(getMsgId());
+            Command command = new DoCreate(coordinator, topic, min_attendees, n_slots, n_invitees, slots, invitees, getMsgId());
             Proposal p = (Proposal) command.Execute(this);
             lock (this.Servers)
             {
                 this.Servers[this.url]++;
+            }
+            //Before updateServers (reliable broadcast)
+            //Say that I already received my command
+            lock (received_commands)
+            {
+                received_commands.Add(command.getCommandId());
             }
             UpdateServers(command);
             if (n_invitees > 0)
@@ -373,12 +421,19 @@ namespace Project
         public void JoinMeeting(String topic, String userName, List<String> slots)
         {
             this.waitBetweenRequests();
-
-            Command command = new DoJoin(topic, userName, slots);
+            //When creating a command updates the msg_id
+            setMsgId();
+            Command command = new DoJoin(topic, userName, slots, getMsgId());
             command.Execute(this);
             lock (this.Servers)
             {
                 this.Servers[this.url]++;
+            }
+            //Before updateServers (reliable broadcast)
+            //Say that I already received my command
+            lock (received_commands)
+            {
+                received_commands.Add(command.getCommandId());
             }
             UpdateServers(command);
 
@@ -515,6 +570,61 @@ namespace Project
 
         public void UpdateMeeting(Command command, string serverURL, Dictionary<string, int> vectorClock)
         {
+            //Implement Reliable_Broadcast
+            //if command is in acks
+            int command_id = command.getCommandId();
+            Console.WriteLine("Recebi a mensagem: " + command_id + " from " + serverURL);
+            lock (acks)
+            {
+                if (acks.ContainsKey(command_id))
+                {
+                    //adds server to the acks of the message
+                    acks[command_id].Add(serverURL);
+                }
+                else
+                {
+                    acks.Add(command_id, new List<string>());
+                    acks[command_id].Add(serverURL);
+                }
+            }
+
+            lock (received_commands)
+            {
+                //If not command received broadcast to everyone
+                if (!received_commands.Contains(command_id))
+                {
+                    received_commands.Add(command_id);
+                    Console.WriteLine("Sou o: " + this.url + " vou enviar " + command_id);
+                    UpdateServers(command);
+                }
+                else
+                {
+                    return;
+                }
+            }
+
+            //Se esta aqui e porque ainda nao foi delivered 
+            int f = 1; // Numero de server que podem falhar f < N/2, onde N e o numero de servers do sistema
+            int x = f + 1;
+            lock (delivered_commands)
+            {
+                lock (acks)
+                {
+                    while (!delivered_commands.Contains(command_id) && acks[command_id].Count < x)
+                    {
+                        Console.WriteLine("Bomdia");
+                        Monitor.Wait(acks);
+                        Console.WriteLine("Tou a dormir");
+                    }
+
+                    delivered_commands.Add(command_id);
+                    Monitor.Pulse(acks);
+                }
+            }
+
+            Console.WriteLine("Causality");
+            //Causality
+
             lock(this.Servers)
             {
                 Console.WriteLine("Server's own clock");
@@ -669,6 +779,18 @@ namespace Project
             }
         }
 
+        //TODO:
+        //This may have looks
+
+        public void setMsgId()
+        {
+            this.msg_id++;
+        }
+
+        public int getMsgId()
+        {
+            return this.msg_id;
+        }
 
     }
 

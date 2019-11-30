@@ -47,7 +47,9 @@ namespace Project
     [Serializable]
     public abstract class Command
     {
+        int command_id;
         public abstract AbstractMeeting Execute(ServerInterface si);
+        public abstract int getCommandId();
     }
 
     [Serializable]
