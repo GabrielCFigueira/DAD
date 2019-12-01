@@ -96,12 +96,14 @@ namespace Project
         ServerInterface Server;
         Dictionary<String, AbstractMeeting> Meetings;
         Dictionary<String, String> Clients;
+        Dictionary<String, String> ClientsSent;
 
         public ClientImpl(String userName)
         {
             this.UserName = userName;
             this.Meetings = new Dictionary<string, AbstractMeeting>();
             this.Clients = new Dictionary<String, String>();
+            this.ClientsSent = new Dictionary<String, String>();
         }
 
         public override object InitializeLifetimeService()
@@ -210,27 +212,35 @@ namespace Project
 
         public void Gossip(Proposal p, int actualRound)
         {
+            this.ClientsSent = new Dictionary<String, String>();
             Console.WriteLine("Comecei o Gossip");
             int totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2));
-            totalRounds += 1; //just to be sure that everyone gets the message
-            Dictionary<String, String> clientsSent = new Dictionary<String, String>();
+            totalRounds += 2; //just to be sure that everyone gets the message
+            Console.WriteLine("Actual Round: " + actualRound);
+            Console.WriteLine("Total rounds: " + totalRounds);
+
             if (actualRound > totalRounds)
             {
                 Console.WriteLine("Acabou o gossip");
                 return;
             }
 
-            AbstractMeeting am = (AbstractMeeting) p;
+            AbstractMeeting am = (AbstractMeeting)p;
 
-            if(!this.Meetings.ContainsKey(am.Topic) && am.N_invitees == 0)
+            lock (this.Meetings)
             {
-                Console.WriteLine("Este proposal é aberta, sou o/a " + this.UserName + " e passei a conhecer a meeting com o Topic " + am.Topic);
-                this.Meetings.Add(am.Topic, am);
-            } 
-            else if(!this.Meetings.ContainsKey(am.Topic) && am.N_invitees != 0 && (am.Invitees.Contains(this.UserName)|| this.UserName == am.Coordinator))
-            {
-                Console.WriteLine("Este proposal é fechada e sou convidado/a, sou o/a " + this.UserName + " e passei a conhecer a meeting com o Topic " + am.Topic);
-                this.Meetings.Add(am.Topic, am);
+                AbstractMeeting p2;
+                this.Meetings.TryGetValue(am.Topic, out p2);
+                if (p2 == null && am.N_invitees == 0)
+                {
+                    Console.WriteLine("Este proposal é aberta, sou o/a " + this.UserName + " e passei a conhecer a meeting com o Topic " + am.Topic);
+                    this.Meetings.Add(am.Topic, am); //WHY DOES THIS FAIL
+                }
+                else if (p2 == null && am.N_invitees != 0 && (am.Invitees.Contains(this.UserName) || this.UserName == am.Coordinator))
+                {
+                    Console.WriteLine("Este proposal é fechada e sou convidado/a, sou o/a " + this.UserName + " e passei a conhecer a meeting com o Topic " + am.Topic);
+                    this.Meetings.Add(am.Topic, am);
+                }
             }
 
             int numberOfMessages = 2;
@@ -238,34 +248,22 @@ namespace Project
             Thread[] pool = new Thread[numberOfMessages];
             for (int i = 0; i < numberOfMessages; i++)
             {
-                pool[i] = new Thread(() => DoSpreadMessage(ref clientsSent, p, actualRound));
+                pool[i] = new Thread(() => DoSpreadMessage(p, actualRound));
                 pool[i].Start();
-                i++;
             }
-
-            /*String chosenClientName = getRandomClientName(this.Clients);
-            while (chosenClientName == this.UserName || clientsSent.ContainsKey(chosenClientName))
-            {
-                chosenClientName = getRandomClientName(this.Clients);
-            }
-
-            clientsSent.Add(chosenClientName, this.Clients[chosenClientName]);
-            Console.WriteLine("Mandei ao/a " + chosenClientName);
-            ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), this.Clients[chosenClientName]);
-            chosenClient.Gossip(p, actualRound + 1);*/
         }
 
-        public void DoSpreadMessage(ref Dictionary<String,String> clientsSent, Proposal p, int actualRound)
+        public void DoSpreadMessage(Proposal p, int actualRound)
         {
             String chosenClientName = getRandomClientName(this.Clients);
-            lock (clientsSent)
+            lock (this.ClientsSent)
             {
-                while (chosenClientName == this.UserName || clientsSent.ContainsKey(chosenClientName))
+                while (chosenClientName == this.UserName || this.ClientsSent.ContainsKey(chosenClientName))
                 {
                     chosenClientName = getRandomClientName(this.Clients);
                 }
 
-                clientsSent.Add(chosenClientName, this.Clients[chosenClientName]);
+                this.ClientsSent.Add(chosenClientName, this.Clients[chosenClientName]);
             }
 
             Console.WriteLine("Mandei ao/a " + chosenClientName);
@@ -291,11 +289,14 @@ namespace Project
 
                 //Respetivo proposal no cliente
                 AbstractMeeting p2;
-                this.Meetings.TryGetValue(p1.Topic, out p2);
-                if(p2 != null && p1.Version > p2.Version)  //  || p2 == null  shouldnt be necessary in the condition TODO why?
+                lock (this.Meetings)
                 {
-                    this.Meetings[p1.Topic] = p1;
-                } 
+                    this.Meetings.TryGetValue(p1.Topic, out p2);
+                    if (p2 != null && p1.Version > p2.Version)  //  || p2 == null  shouldnt be necessary in the condition TODO why?
+                    {
+                        this.Meetings[p1.Topic] = p1;
+                    }
+                }
             }
 
 
@@ -306,10 +307,13 @@ namespace Project
 
                     //Respetivo meeting no cliente
                     AbstractMeeting m2;
-                    this.Meetings.TryGetValue(m1.Topic, out m2);
-                    if ((m2 != null && m1.Version > m2.Version) || m2 == null) //  || m2 == null  shouldnt be necessary in the condition TODO why?
+                    lock (this.Meetings)
                     {
-                        this.Meetings[m1.Topic] = m1;
+                        this.Meetings.TryGetValue(m1.Topic, out m2);
+                        if ((m2 != null && m1.Version > m2.Version) || m2 == null) //  || m2 == null  shouldnt be necessary in the condition TODO why?
+                        {
+                            this.Meetings[m1.Topic] = m1;
+                        }
                     }
                 }
             }
