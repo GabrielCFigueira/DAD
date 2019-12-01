@@ -56,6 +56,8 @@ namespace Project
         Int32 ticket = 0;
         Int32 lastTicket = 0;
 
+        bool freeze = false;
+
         [Serializable]
         private class DoCreate : Command
         {
@@ -304,6 +306,15 @@ namespace Project
         {
             this.waitBetweenRequests();
 
+            lock (this)
+            {
+                while (freeze)
+                {
+                    Monitor.Wait(this);
+                }
+                Monitor.PulseAll(this);
+            }
+
             int newTicket;
             if(masterServer == "1")
             {
@@ -337,7 +348,17 @@ namespace Project
         public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
         {
             this.waitBetweenRequests();
-           
+
+            lock (this)
+            {
+                while (freeze)
+                {
+                    Monitor.Wait(this);
+                }
+                Monitor.PulseAll(this);
+            }
+
+
             Command command = new DoCreate(coordinator, topic, min_attendees, n_slots, n_invitees, slots, invitees);
             Proposal p = (Proposal) command.Execute(this);
             lock (this.Servers)
@@ -374,6 +395,15 @@ namespace Project
         {
             this.waitBetweenRequests();
 
+            lock (this)
+            {
+                while (freeze)
+                {
+                    Monitor.Wait(this);
+                }
+                Monitor.PulseAll(this);
+            }
+
             Command command = new DoJoin(topic, userName, slots);
             command.Execute(this);
             lock (this.Servers)
@@ -387,6 +417,16 @@ namespace Project
         public void ListMeetings(String userName)
         {
             this.waitBetweenRequests();
+
+            lock (this)
+            {
+                while (freeze)
+                {
+                    Monitor.Wait(this);
+                }
+                Monitor.PulseAll(this);
+            }
+
             lock (this.Proposals)
             {
                 lock (this.Meetings)
@@ -583,6 +623,16 @@ namespace Project
         {
             Console.WriteLine("\n-----STATUS-----\n");
             Console.WriteLine("I'm ALIVE!");
+
+            lock (this)
+            {
+
+                if (freeze)
+                {
+                    Console.WriteLine("But I'm Freezed");
+                }
+            }
+
             Console.WriteLine("Server id: " + id + " Server url: " + url);
             //Console.WriteLine("Maximum Faults: " + maxFaults);
             //Console.WriteLine("Maximum Delay: " +  maxDelay);
@@ -638,14 +688,22 @@ namespace Project
             shutdown();
         }
 
-        public void Freeze(string server_id)
+        public void Freeze()
         {
-            throw new NotImplementedException();
+            lock (this)
+            {
+                freeze = true;
+                Monitor.PulseAll(this);
+            }
         }
 
-        public void Unfreeze(string server_id)
+        public void Unfreeze()
         {
-            throw new NotImplementedException();
+            lock (this)
+            {
+                freeze = false;
+                Monitor.PulseAll(this);
+            }
         }
 
         public void shutdown()

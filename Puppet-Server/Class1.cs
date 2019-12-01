@@ -26,8 +26,8 @@ namespace Puppet_Server
 
         void Status();
         void Crash();
-        void Freeze(String server_id);
-        void Unfreeze(String server_id);
+        void Freeze();
+        void Unfreeze();
 
         void AddServer(String serverURL);
 

@@ -115,7 +115,7 @@ namespace PuppetMaster
 
             string serverID = commands[0];
 
-            PastCommand.Text += "Crashing Server: " + serverID;
+            PastCommand.Text += "Crashing Server: " + serverID + "\r\n";
 
             string url = pmi.getServers()[serverID].AbsoluteUri;
 
@@ -124,6 +124,53 @@ namespace PuppetMaster
 
             //Removes from the server dictionary
             pmi.getServers().Remove(serverID);
+        }
+
+        private void Freeze_Click(object sender, EventArgs e)
+        {
+            string command = CommandBox.Text;
+            CommandBox.Text = "";
+            string[] commands = command.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            if (commands.Length == 0)
+                return;
+            if (commands.Length < 0)
+            {
+                PastCommand.Text += "Invalid Command: \"" + command + "\"\r\n";
+                return;
+            }
+
+            string serverID = commands[0];
+
+            PastCommand.Text += "Freezing Server: " + serverID + "\r\n";
+
+            string url = pmi.getServers()[serverID].AbsoluteUri;
+
+            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), url);
+            server.Freeze();
+        }
+
+        private void Unfreeze_Click(object sender, EventArgs e)
+        {
+            string command = CommandBox.Text;
+            CommandBox.Text = "";
+            string[] commands = command.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            if (commands.Length == 0)
+                return;
+            if (commands.Length < 0)
+            {
+                PastCommand.Text += "Invalid Command: \"" + command + "\"\r\n";
+                return;
+            }
+
+            string serverID = commands[0];
+
+            PastCommand.Text += "Unfreezing Server: " + serverID + "\r\n";
+
+            string url = pmi.getServers()[serverID].AbsoluteUri;
+
+            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), url);
+            server.Unfreeze();
+
         }
     }
 
@@ -352,12 +399,19 @@ namespace PuppetMaster
 
         public void Freeze(string serverID)
         {
-            throw new NotImplementedException();
+            string url = serverDict[serverID].AbsoluteUri;
+
+            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), url);
+            server.Freeze();
+           
         }
 
         public void Unfreeze(string serverID)
         {
-            throw new NotImplementedException();
+            string url = serverDict[serverID].AbsoluteUri;
+
+            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), url);
+            server.Unfreeze();
         }
     }
 }

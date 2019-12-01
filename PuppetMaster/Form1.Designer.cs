@@ -34,6 +34,8 @@
             this.button2 = new System.Windows.Forms.Button();
             this.Status = new System.Windows.Forms.Button();
             this.Crash = new System.Windows.Forms.Button();
+            this.Freeze = new System.Windows.Forms.Button();
+            this.Unfreeze = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // CommandBox
@@ -97,11 +99,33 @@
             this.Crash.UseVisualStyleBackColor = true;
             this.Crash.Click += new System.EventHandler(this.Crash_Click);
             // 
+            // Freeze
+            // 
+            this.Freeze.Location = new System.Drawing.Point(1108, 359);
+            this.Freeze.Name = "Freeze";
+            this.Freeze.Size = new System.Drawing.Size(194, 48);
+            this.Freeze.TabIndex = 7;
+            this.Freeze.Text = "Freeze";
+            this.Freeze.UseVisualStyleBackColor = true;
+            this.Freeze.Click += new System.EventHandler(this.Freeze_Click);
+            // 
+            // Unfreeze
+            // 
+            this.Unfreeze.Location = new System.Drawing.Point(1108, 439);
+            this.Unfreeze.Name = "Unfreeze";
+            this.Unfreeze.Size = new System.Drawing.Size(196, 45);
+            this.Unfreeze.TabIndex = 8;
+            this.Unfreeze.Text = "Unfreeze";
+            this.Unfreeze.UseVisualStyleBackColor = true;
+            this.Unfreeze.Click += new System.EventHandler(this.Unfreeze_Click);
+            // 
             // PuppetMaster
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(12F, 25F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1767, 864);
+            this.Controls.Add(this.Unfreeze);
+            this.Controls.Add(this.Freeze);
             this.Controls.Add(this.Crash);
             this.Controls.Add(this.Status);
             this.Controls.Add(this.button2);
@@ -125,6 +149,8 @@
         private System.Windows.Forms.Button button2;
         private System.Windows.Forms.Button Status;
         private System.Windows.Forms.Button Crash;
+        private System.Windows.Forms.Button Freeze;
+        private System.Windows.Forms.Button Unfreeze;
     }
 }
 
