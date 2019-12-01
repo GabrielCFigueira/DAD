@@ -208,56 +208,69 @@ namespace Project
             this.Meetings.Add(p.Topic, p);
         }
 
-        public void Gossip(Proposal p)
+        public void Gossip(Proposal p, int actualRound)
         {
             Console.WriteLine("Comecei o Gossip");
-            foreach(KeyValuePair<String, String> entry in this.Clients)
+            int totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2));
+            totalRounds += 1; //just to be sure that everyone gets the message
+            Dictionary<String, String> clientsSent = new Dictionary<String, String>();
+            if (actualRound > totalRounds)
             {
-                Console.WriteLine(entry.Value);
-            }
-            AbstractMeeting am = (AbstractMeeting) p;
-            Dictionary<String, String> clientsToSend = new Dictionary<String, String>();
-            foreach(KeyValuePair<String, String> entry in this.Clients)
-            {
-                clientsToSend[entry.Key] = entry.Value;
-            }
-
-            if (this.Meetings.ContainsKey(am.Topic))
-            {
-                Console.WriteLine("Ja tenho o proposal. Vou embora");    
+                Console.WriteLine("Acabou o gossip");
                 return;
             }
 
-            if(!this.Meetings.ContainsValue(am) && am.N_invitees == 0)
+            AbstractMeeting am = (AbstractMeeting) p;
+
+            if(!this.Meetings.ContainsKey(am.Topic) && am.N_invitees == 0)
             {
                 Console.WriteLine("Este proposal é aberta, sou o/a " + this.UserName + " e passei a conhecer a meeting com o Topic " + am.Topic);
                 this.Meetings.Add(am.Topic, am);
             } 
-            else if(!this.Meetings.ContainsValue(am) && am.N_invitees != 0 && am.Invitees.Contains(this.UserName))
+            else if(!this.Meetings.ContainsKey(am.Topic) && am.N_invitees != 0 && (am.Invitees.Contains(this.UserName)|| this.UserName == am.Coordinator))
             {
                 Console.WriteLine("Este proposal é fechada e sou convidado/a, sou o/a " + this.UserName + " e passei a conhecer a meeting com o Topic " + am.Topic);
                 this.Meetings.Add(am.Topic, am);
             }
 
-            //List<String> listClientNames = this.Clients.Keys.ToList();
-            int numberOfMessages = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2)); //verificar condicao melhor de propagacao
-            if (numberOfMessages == 0) //means theres 2 clients
-                numberOfMessages = 1;
-            else if (numberOfMessages < 0) //means theres only one client
-                numberOfMessages = 0;
+            int numberOfMessages = 2;
             Console.WriteLine("Vou mandar " + numberOfMessages + " mensagens");
-            for(int i = 0; i < numberOfMessages; i++)
+            Thread[] pool = new Thread[numberOfMessages];
+            for (int i = 0; i < numberOfMessages; i++)
             {
-                String chosenClientName = getRandomClientName(clientsToSend);
-                while (chosenClientName == this.UserName)
-                {
-                    chosenClientName = getRandomClientName(clientsToSend);
-                }
-                clientsToSend.Remove(chosenClientName);
-                Console.WriteLine("Mandei ao/a " + chosenClientName);
-                ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), this.Clients[chosenClientName]);
-                chosenClient.Gossip(p); //mudar para chamada assincrona
+                pool[i] = new Thread(() => DoSpreadMessage(ref clientsSent, p, actualRound));
+                pool[i].Start();
+                i++;
             }
+
+            /*String chosenClientName = getRandomClientName(this.Clients);
+            while (chosenClientName == this.UserName || clientsSent.ContainsKey(chosenClientName))
+            {
+                chosenClientName = getRandomClientName(this.Clients);
+            }
+
+            clientsSent.Add(chosenClientName, this.Clients[chosenClientName]);
+            Console.WriteLine("Mandei ao/a " + chosenClientName);
+            ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), this.Clients[chosenClientName]);
+            chosenClient.Gossip(p, actualRound + 1);*/
+        }
+
+        public void DoSpreadMessage(ref Dictionary<String,String> clientsSent, Proposal p, int actualRound)
+        {
+            String chosenClientName = getRandomClientName(this.Clients);
+            lock (clientsSent)
+            {
+                while (chosenClientName == this.UserName || clientsSent.ContainsKey(chosenClientName))
+                {
+                    chosenClientName = getRandomClientName(this.Clients);
+                }
+
+                clientsSent.Add(chosenClientName, this.Clients[chosenClientName]);
+            }
+
+            Console.WriteLine("Mandei ao/a " + chosenClientName);
+            ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), this.Clients[chosenClientName]);
+            chosenClient.Gossip(p, actualRound + 1);
         }
 
         public String getRandomClientName(Dictionary<String,String> clientsToSend)

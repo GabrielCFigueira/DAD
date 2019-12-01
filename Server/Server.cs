@@ -349,7 +349,7 @@ namespace Project
             UpdateServers(command);
             ClientInterface c = this.Clients[coordinator];
             //c.AddProposal(p);
-            c.Gossip(p);
+            c.Gossip(p,1);
             /*if (n_invitees > 0)
             {
                 foreach (String s in invitees)
