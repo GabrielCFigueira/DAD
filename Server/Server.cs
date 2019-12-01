@@ -588,8 +588,11 @@ namespace Project
                 }
             }
 
+            //Monitor.PulseAll(acks);
+
             lock (received_commands)
             {
+                Console.WriteLine("Ganhei o lock dos received_commands");
                 //If not command received broadcast to everyone
                 if (!received_commands.Contains(command_id))
                 {
@@ -599,6 +602,7 @@ namespace Project
                 }
                 else
                 {
+                    Monitor.PulseAll(received_commands);
                     return;
                 }
             }
@@ -606,21 +610,26 @@ namespace Project
             //Se esta aqui e porque ainda nao foi delivered 
             int f = 1; // Numero de server que podem falhar f < N/2, onde N e o numero de servers do sistema
             int x = f + 1;
-            lock (delivered_commands)
-            {
+            //lock (delivered_commands)
+            //{
                 lock (acks)
                 {
-                    while (!delivered_commands.Contains(command_id) && acks[command_id].Count < x)
+                Console.WriteLine("Ganhei o lock dos acks");
+                //while (!delivered_commands.Contains(command_id) && acks[command_id].Count < x)
+                Console.WriteLine(acks[command_id].Count);
+                    while (acks[command_id].Count < x)
                     {
-                        Console.WriteLine("Bomdia");
+                        Console.WriteLine("Vou dormir");
                         Monitor.Wait(acks);
-                        Console.WriteLine("Tou a dormir");
+                        Console.WriteLine("Acordei");
                     }
 
                     delivered_commands.Add(command_id);
-                    Monitor.Pulse(acks);
+                Console.WriteLine("Vou acordar a malta");
+                    Monitor.PulseAll(acks);
                 }
-            }
+               // Monitor.PulseAll(delivered_commands);
+            //}
 
             Console.WriteLine("Causality");
             //Causality
