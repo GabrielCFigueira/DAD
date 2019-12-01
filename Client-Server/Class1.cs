@@ -39,7 +39,7 @@ namespace Project
 
         void UpdateMeeting(Command command, string serverURL, Dictionary<string, int> vectorClock);
 
-        void UpdateClient(String client_url,String userName);
+        void UpdateClient(String client_url,String userName, string serverURL);
 
         int GetTicket();
     }
@@ -47,9 +47,9 @@ namespace Project
     [Serializable]
     public abstract class Command
     {
-        int command_id;
+        string command_id;
         public abstract AbstractMeeting Execute(ServerInterface si);
-        public abstract int getCommandId();
+        public abstract string getCommandId();
     }
 
     [Serializable]

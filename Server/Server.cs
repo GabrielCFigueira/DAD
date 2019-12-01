@@ -56,17 +56,14 @@ namespace Project
         Int32 ticket = 0;
         Int32 lastTicket = 0;
 
-        //Reliable BroadCast structures
-        int msg_id;
-        Dictionary<int, List<string>> acks; //Key: topic, values: list of servers
-        List<int> received_commands; //Every command has a topic  -> I think this can be the list of the keys of acks
-        List<int> delivered_commands; //Try to find a way that this is my list of abstractMeetings
-
+        //Reliable_BroadCast structures
+        Dictionary<string, List<string>> acks; //Key: depends on command, values: list of servers
+        List<string> received_commands; 
 
         [Serializable]
         private class DoCreate : Command
         {
-            int command_id;
+            string command_id;
             string coordinator;
             string topic;
             int min_attendees;
@@ -75,7 +72,7 @@ namespace Project
             List<String> slots;
             List<String> invitees;
 
-            public DoCreate(string coordinator, string topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees, int msg_id)
+            public DoCreate(string coordinator, string topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
             {
                 this.coordinator = coordinator;
                 this.topic = topic;
@@ -84,7 +81,7 @@ namespace Project
                 this.n_invitees = n_invitees;
                 this.slots = slots;
                 this.invitees = invitees;
-                this.command_id = msg_id;
+                this.command_id = topic + "Create";  //id Create
             }
 
             override public AbstractMeeting Execute(ServerInterface si)
@@ -111,7 +108,7 @@ namespace Project
                 }
             }
 
-            override public int getCommandId()
+            override public string getCommandId()
             {
                 return this.command_id;
             }
@@ -120,16 +117,16 @@ namespace Project
         [Serializable]
         private class DoJoin : Command
         {
-            int command_id;
+            string command_id;
             string topic;
             string userName;
             List<string> slots;
-            public DoJoin(string topic, string userName, List<string> slots, int msg_id)
+            public DoJoin(string topic, string userName, List<string> slots)
             {
                 this.topic = topic;
                 this.userName = userName;
                 this.slots = slots;
-                this.command_id = msg_id;
+                this.command_id = topic +  userName;
             }
 
             override public AbstractMeeting Execute(ServerInterface si)
@@ -173,7 +170,7 @@ namespace Project
                 }
             }
 
-            override public int getCommandId()
+            override public string getCommandId()
             {
                 return this.command_id;
             }
@@ -182,15 +179,15 @@ namespace Project
         [Serializable]
         private class DoClose : Command
         {
-            int command_id;
+            string command_id;
             string topic;
             string userName;
 
-            public DoClose(String userName, String topic, int msg_id)
+            public DoClose(String userName, String topic)
             {
                 this.topic = topic;
                 this.userName = userName;
-                this.command_id = msg_id;
+                this.command_id = topic;
             }
 
             override public AbstractMeeting Execute(ServerInterface si)
@@ -293,7 +290,7 @@ namespace Project
                 }
             }
 
-            override public int getCommandId()
+            override public string getCommandId()
             {
                 return this.command_id;
             }
@@ -315,11 +312,9 @@ namespace Project
             this.puppetURL = puppetURL;
             this.masterServer = masterServer;
 
-            //RB
-            this.msg_id = 0;
-            this.acks = new Dictionary<int, List<string>>();
-            this.received_commands = new List<int>();
-            this.delivered_commands = new List<int>();
+            //Reliable_Broadcast
+            this.acks = new Dictionary<string, List<string>>();
+            this.received_commands = new List<string>();
 ;
         }
 
@@ -357,42 +352,40 @@ namespace Project
                     Monitor.Wait(lockTicket);
                 }
             }
-            setMsgId();
-            Command command = new DoClose(userName, topic, getMsgId());
+            Command command = new DoClose(userName, topic);
             command.Execute(this);
             lock (this.Servers)
             {
                 this.Servers[this.url]++;
             }
             //Before updateServers (reliable broadcast)
-            //Say that I already received my command
-            lock (received_commands)
+            string command_id = command.getCommandId();
+            lock (received_commands) //Adding my message to my received_commands
             {
-                received_commands.Add(command.getCommandId());
+                received_commands.Add(command_id);
             }
-            UpdateServers(command);
-
             
+            UpdateServers(command);
         }
 
         public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
         {
             this.waitBetweenRequests();
-            setMsgId();
-            //Console.WriteLine(getMsgId());
-            Command command = new DoCreate(coordinator, topic, min_attendees, n_slots, n_invitees, slots, invitees, getMsgId());
+            
+            Command command = new DoCreate(coordinator, topic, min_attendees, n_slots, n_invitees, slots, invitees);
             Proposal p = (Proposal) command.Execute(this);
             lock (this.Servers)
             {
                 this.Servers[this.url]++;
             }
-            //Before updateServers (reliable broadcast)
-            //Say that I already received my command
+            
             lock (received_commands)
             {
                 received_commands.Add(command.getCommandId());
             }
+            
             UpdateServers(command);
+            
             if (n_invitees > 0)
             {
                 foreach (String s in invitees)
@@ -421,16 +414,14 @@ namespace Project
         public void JoinMeeting(String topic, String userName, List<String> slots)
         {
             this.waitBetweenRequests();
-            //When creating a command updates the msg_id
-            setMsgId();
-            Command command = new DoJoin(topic, userName, slots, getMsgId());
+            
+            Command command = new DoJoin(topic, userName, slots);
             command.Execute(this);
             lock (this.Servers)
             {
                 this.Servers[this.url]++;
             }
             //Before updateServers (reliable broadcast)
-            //Say that I already received my command
             lock (received_commands)
             {
                 received_commands.Add(command.getCommandId());
@@ -462,6 +453,12 @@ namespace Project
             {
                 Clients.Add(userName, c);
             }
+
+            lock (received_commands)
+            {
+                received_commands.Add(client_URL);
+            }
+
             this.UpdateServersClients(client_URL, userName);
             Console.WriteLine("Registei o/a cliente " + userName);
 
@@ -552,11 +549,60 @@ namespace Project
         {
             ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
             Console.WriteLine("Sou o servidor e vou fazer update com o user " + userName);
-            si.UpdateClient(clientUrl, userName);
+            si.UpdateClient(clientUrl, userName, this.url);
         }
 
-        public void UpdateClient(String client_url,string userName)
+        public void UpdateClient(string client_url, string userName, string serverURL)
         {
+            //Implement Reliable_Broadcast_Client
+            //if command is in acks
+            string id = client_url;
+            lock (acks)
+            {
+                if (acks.ContainsKey(id))
+                {
+                    //adds server to the acks of the message
+                    acks[id].Add(serverURL);
+                }
+                else
+                {
+                    acks.Add(id, new List<string>());
+                    acks[id].Add(serverURL);
+                }
+                Monitor.PulseAll(acks);  //Wake every spleeping thread that are waiting for acks
+            }
+
+            lock (received_commands)
+            {
+                //If not command received broadcast to everyone
+                if (!received_commands.Contains(id))
+                {
+                    received_commands.Add(id);
+                    UpdateServersClients(client_url, userName);
+                }
+                else
+                {
+                    return;
+                }
+            }
+
+            //From this point message will be delivered
+            
+            //For now it's like this
+            int f = 1;   //Number of fails
+            int x = f + 1;
+            lock (acks)
+            {
+                while (acks[id].Count < x)
+                {
+                    Monitor.Wait(acks);
+                }
+                Monitor.PulseAll(acks);
+            }
+            
+            Console.WriteLine("--Causality--");
+            //Causality
+
             lock (this.Clients)
             {
                 ClientInterface ci = (ClientInterface)Activator.GetObject(typeof(ClientInterface), client_url);
@@ -570,10 +616,9 @@ namespace Project
 
         public void UpdateMeeting(Command command, string serverURL, Dictionary<string, int> vectorClock)
         {
-            //Implement Reliable_Broadcast
+            //Implement Reliable_Broadcast_Servers
             //if command is in acks
-            int command_id = command.getCommandId();
-            Console.WriteLine("Recebi a mensagem: " + command_id + " from " + serverURL);
+            string command_id = command.getCommandId();
             lock (acks)
             {
                 if (acks.ContainsKey(command_id))
@@ -586,71 +631,56 @@ namespace Project
                     acks.Add(command_id, new List<string>());
                     acks[command_id].Add(serverURL);
                 }
+                Monitor.PulseAll(acks);  //Wake every spleeping thread that are waiting for acks
             }
-
-            //Monitor.PulseAll(acks);
 
             lock (received_commands)
             {
-                Console.WriteLine("Ganhei o lock dos received_commands");
                 //If not command received broadcast to everyone
                 if (!received_commands.Contains(command_id))
                 {
                     received_commands.Add(command_id);
-                    Console.WriteLine("Sou o: " + this.url + " vou enviar " + command_id);
                     UpdateServers(command);
                 }
                 else
                 {
-                    Monitor.PulseAll(received_commands);
                     return;
                 }
             }
 
-            //Se esta aqui e porque ainda nao foi delivered 
-            int f = 1; // Numero de server que podem falhar f < N/2, onde N e o numero de servers do sistema
+            //From this point message will be delivered
+            int f = 1; //Number of fails
             int x = f + 1;
-            //lock (delivered_commands)
-            //{
-                lock (acks)
+            lock (acks)
+            {
+                while (acks[command_id].Count < x)
                 {
-                Console.WriteLine("Ganhei o lock dos acks");
-                //while (!delivered_commands.Contains(command_id) && acks[command_id].Count < x)
-                Console.WriteLine(acks[command_id].Count);
-                    while (acks[command_id].Count < x)
-                    {
-                        Console.WriteLine("Vou dormir");
-                        Monitor.Wait(acks);
-                        Console.WriteLine("Acordei");
-                    }
-
-                    delivered_commands.Add(command_id);
-                Console.WriteLine("Vou acordar a malta");
-                    Monitor.PulseAll(acks);
+                    Monitor.Wait(acks);
                 }
-               // Monitor.PulseAll(delivered_commands);
-            //}
+
+                Monitor.PulseAll(acks);
+            }
 
             Console.WriteLine("Causality");
             //Causality
 
-            lock(this.Servers)
-            {
-                Console.WriteLine("Server's own clock");
-                printClock(this.Servers);
-                Console.WriteLine("Received Clock");
-                printClock(vectorClock);
-                while(!checkClock(serverURL, vectorClock))
-                {
-                    Monitor.Wait(this.Servers);
-                }
+            //lock(this.Servers)
+            //{
+            //    Console.WriteLine("Server's own clock");
+            //    printClock(this.Servers);
+            //    Console.WriteLine("Received Clock");
+            //    printClock(vectorClock);
+            //    while(!checkClock(serverURL, vectorClock))
+            //    {
+            //        Monitor.Wait(this.Servers);
+            //    }
 
-                this.Servers[serverURL]++;
+            //    this.Servers[serverURL]++;
 
-                Monitor.Pulse(this.Servers);
-            }
+            //    Monitor.Pulse(this.Servers);
+            //}
+
             command.Execute(this);
-            
         }
 
         private bool checkClock(string serverURL, Dictionary<string, int> vectorClock)
@@ -786,19 +816,6 @@ namespace Project
             {
                 return ++ticket;
             }
-        }
-
-        //TODO:
-        //This may have looks
-
-        public void setMsgId()
-        {
-            this.msg_id++;
-        }
-
-        public int getMsgId()
-        {
-            return this.msg_id;
         }
 
     }
