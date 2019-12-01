@@ -120,16 +120,31 @@ namespace Project
                 ServerImpl server = (ServerImpl)si;
                 lock (server.Proposals)
                 {
-                    Proposal p = null;
+                    AbstractMeeting am = null;
 
-                    if (!server.Proposals.TryGetValue(this.Topic, out p))
+                    if (!server.Proposals.ContainsKey(this.Topic))
                     {
-                        Console.WriteLine("O cliente " + userName + " fez join a uma Meeting nao existente");
-                        return p;
+                        Console.WriteLine("O cliente " + userName + " fez join a uma Meeting ja fechada");
+                        foreach (LocationMeetings lm in server.Meetings.Values)
+                        {
+                            foreach (Meeting m in lm.Meetings)
+                            {
+                                if (m.Topic == this.Topic)
+                                {
+                                    am = m;
+                                    goto label;
+                                }
+                            }
+                        }
                     }
-
+                    else
+                    {
+                        am = server.Proposals[this.Topic];
+                    }
+                    label:
+                    
                     List<Slot> Slots = new List<Slot>();
-                    if ((p.N_invitees != 0 && p.Invitees.Contains(userName)) || p.N_invitees == 0 || p.Coordinator == userName)
+                    if ((am.N_invitees != 0 && am.Invitees.Contains(userName)) || am.N_invitees == 0 || am.Coordinator == userName)
                     {
                         foreach (String s in slots)
                         {
@@ -137,21 +152,23 @@ namespace Project
 
                             Location l = server.Meetings[zone_date[0]].Location;
                             Slot slot = new Slot(l, zone_date[1]);
-                            p.Slots[s].Votes += 1;
-                            slot.Votes = p.Slots[s].Votes;
+                            if(am.isProposal())
+                            {
+                                ((Proposal) am).Slots[s].Votes += 1;
+                            }
                             Slots.Add(slot);
                         }
 
                         Attendee a = new Attendee(userName, Slots);
-                        p.Version += 1;
-                        p.Attendees.Add(a);
+                        am.Version += 1;
+                        am.Attendees.Add(a);
                     }
                     else
                     {
                         Console.WriteLine("Sou o/a " + userName + " e estou a dar join a um meeting onde nao estou convidado/a");
                     }
 
-                    return p;
+                    return am;
 
                 }
             }
@@ -252,7 +269,7 @@ namespace Project
                                     attendees.RemoveAt(attendees.Count - 1);
                                 }
 
-                                Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, attendees.Count, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, attendees);
+                                Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, attendees);
                                 server.Meetings[chosenSlot.Location.Local].addMeeting(meeting);
                                 server.Proposals.Remove(p.Topic);
 
@@ -357,9 +374,10 @@ namespace Project
 
         public void JoinMeeting(String topic, String userName, List<String> slots)
         {
-            this.waitBetweenRequests();
-            if(!this.Proposals.ContainsKey(topic)) //FIXME pending create?
+            //this.waitBetweenRequests();
+            if(!this.Proposals.ContainsKey(topic) && false) //FIXME pending create?
             {
+                Console.WriteLine("no such proposal");
                 return; //FIXME failure
             }
             Command command = new DoJoin(topic, userName, slots);
@@ -368,6 +386,7 @@ namespace Project
                 command.Execute(this);
                 this.Servers[this.url]++;
             }
+            this.waitBetweenRequests();
             UpdateServers(command);
 
         }
@@ -786,7 +805,7 @@ namespace Project
                                     this.Meetings[m.Slot.Location.Local].addMeeting(m);
                                     Proposal p = this.Proposals[topic];
                                     this.Proposals.Remove(topic);
-
+                                    Console.WriteLine("atention!");
                                     foreach (Attendee a in p.Attendees)
                                     {
                                         bool notIn = true;
@@ -795,6 +814,7 @@ namespace Project
                                             if (attendee.Name == a.Name)
                                             {
                                                 notIn = false;
+                                                break;
                                             }
                                         }
                                         if (notIn && CouldAttend(m, a))
@@ -831,7 +851,7 @@ namespace Project
 
         private Boolean CouldAttend(Meeting m, Attendee user)
         {
-            if(m.N_invitees == m.SelectedRoom.Capacity)
+            if(m.Attendees.Count == m.SelectedRoom.Capacity)
             {
                 return false;
             }
