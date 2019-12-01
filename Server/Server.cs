@@ -43,6 +43,8 @@ namespace Project
         Dictionary<String, Proposal> Proposals;
         Dictionary<String, LocationMeetings> Meetings;
         Dictionary<String, int> Servers;
+        Dictionary<String, Command> Closes;
+        Dictionary<int, Ticket> Tickets;
 
         string id;
         String url;
@@ -52,7 +54,6 @@ namespace Project
 
         String puppetURL;
         String masterServer;
-        String lockTicket = "";
         Int32 ticket = 0;
         Int32 lastTicket = 0;
 
@@ -60,7 +61,6 @@ namespace Project
         private class DoCreate : Command
         {
             string coordinator;
-            string topic;
             int min_attendees;
             int n_slots;
             int n_invitees;
@@ -68,9 +68,9 @@ namespace Project
             List<String> invitees;
 
             public DoCreate(string coordinator, string topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
+                : base(topic)
             {
                 this.coordinator = coordinator;
-                this.topic = topic;
                 this.min_attendees = min_attendees;
                 this.n_slots = n_slots;
                 this.n_invitees = n_invitees;
@@ -94,7 +94,7 @@ namespace Project
                             Slot slot = new Slot(l, zone_date[1]);
                             Slots.Add(s, slot);
                         }
-                        Proposal p = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, Slots, invitees);
+                        Proposal p = new Proposal(coordinator, this.Topic, min_attendees, n_slots, n_invitees, Slots, invitees);
                         server.Proposals.Add(p.Topic, p);
 
                         return p;
@@ -106,12 +106,11 @@ namespace Project
         [Serializable]
         private class DoJoin : Command
         {
-            string topic;
             string userName;
             List<string> slots;
             public DoJoin(string topic, string userName, List<string> slots)
+                : base(topic)
             {
-                this.topic = topic;
                 this.userName = userName;
                 this.slots = slots;
             }
@@ -123,7 +122,7 @@ namespace Project
                 {
                     Proposal p = null;
 
-                    if (!server.Proposals.TryGetValue(topic, out p))
+                    if (!server.Proposals.TryGetValue(this.Topic, out p))
                     {
                         Console.WriteLine("O cliente " + userName + " fez join a uma Meeting nao existente");
                         return p;
@@ -161,12 +160,11 @@ namespace Project
         [Serializable]
         private class DoClose : Command
         {
-            string topic;
             string userName;
 
             public DoClose(String userName, String topic)
+                : base(topic)
             {
-                this.topic = topic;
                 this.userName = userName;
             }
 
@@ -177,7 +175,7 @@ namespace Project
                 {
                     lock (server.Meetings)
                     {
-                        Proposal p = server.Proposals[topic];
+                        Proposal p = server.Proposals[this.Topic];
                         Slot chosenSlot = null;
                         Room selectedRoom = null;
                         double efficiency = 0;
@@ -232,37 +230,37 @@ namespace Project
                             {
                                 p.IsCancelled = true;
                                 p.Version += 1;
-                                lock(server.lockTicket)
-                                {
-                                    server.lastTicket++;
-                                }
                                 return p;
                             }
                             else
-                            {
-                                while (p.Attendees.Count > selectedRoom.Capacity)
+                            { 
+                                List<Attendee> attendees = new List<Attendee>();
+                                foreach(Attendee at in p.Attendees)
                                 {
-                                    p.Attendees.RemoveAt(p.Attendees.Count - 1);
+                                    foreach(Slot s in at.Available_slots)
+                                    {
+                                        if(s.Date == chosenSlot.Date && s.Location.Local == chosenSlot.Location.Local)
+                                        {
+                                            attendees.Add(at);
+                                            break;
+                                        }
+                                    }
                                 }
 
-                                Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, p.Attendees);
+                                while (attendees.Count > selectedRoom.Capacity)
+                                {
+                                    attendees.RemoveAt(attendees.Count - 1);
+                                }
+
+                                Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, attendees.Count, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, attendees);
                                 server.Meetings[chosenSlot.Location.Local].addMeeting(meeting);
                                 server.Proposals.Remove(p.Topic);
-
-                                lock (server.lockTicket)
-                                {
-                                    server.lastTicket++;
-                                }
 
                                 return meeting;
                             }
                         }
                         else
                         {
-                            lock (server.lockTicket)
-                            {
-                                server.lastTicket++;
-                            }
                             throw new Exception(); //coordinator must be the one closing
                         }
 
@@ -270,6 +268,7 @@ namespace Project
                 }
             }
         }
+
 
         public ServerImpl(string id, String url, int maxFaults, int minDelay, int maxDelay, String puppetURL, string masterServer)
         {
@@ -283,6 +282,8 @@ namespace Project
             this.Meetings = new Dictionary<string, LocationMeetings>();
             this.Servers = new Dictionary<string, int>();
             this.Servers.Add(url, 0);
+            this.Closes = new Dictionary<string, Command>();
+            this.Tickets = new Dictionary<int, Ticket>();
 
             this.puppetURL = puppetURL;
             this.masterServer = masterServer;
@@ -303,34 +304,17 @@ namespace Project
         public void CloseMeeting(String userName, String topic)
         {
             this.waitBetweenRequests();
-
-            int newTicket;
-            if(masterServer == "1")
-            {
-                newTicket = GetTicket();
-            }
-            else
-            {
-                ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), masterServer);
-                newTicket = si.GetTicket();
-            }
-
-            lock (lockTicket)
-            {
-                while (newTicket - 1 != lastTicket)
-                {
-                    Monitor.Wait(lockTicket);
-                }
-            }
-
-            Command command = new DoClose(userName, topic);
-            command.Execute(this);
             lock (this.Servers)
             {
-                this.Servers[this.url]++;
+                lock (this.Tickets)
+                {
+                    lock (this.Closes)
+                    {
+                        Command command = new DoClose(userName, topic);
+                        ExecuteTicket(command);
+                    }
+                }
             }
-            UpdateServers(command);
-
             
         }
 
@@ -339,9 +323,10 @@ namespace Project
             this.waitBetweenRequests();
            
             Command command = new DoCreate(coordinator, topic, min_attendees, n_slots, n_invitees, slots, invitees);
-            Proposal p = (Proposal) command.Execute(this);
+            Proposal p;
             lock (this.Servers)
             {
+                p = (Proposal)command.Execute(this);
                 this.Servers[this.url]++;
             }
             UpdateServers(command);
@@ -373,11 +358,14 @@ namespace Project
         public void JoinMeeting(String topic, String userName, List<String> slots)
         {
             this.waitBetweenRequests();
-
+            if(!this.Proposals.ContainsKey(topic)) //FIXME pending create?
+            {
+                return; //FIXME failure
+            }
             Command command = new DoJoin(topic, userName, slots);
-            command.Execute(this);
             lock (this.Servers)
             {
+                command.Execute(this);
                 this.Servers[this.url]++;
             }
             UpdateServers(command);
@@ -446,6 +434,28 @@ namespace Project
                 }
             }
             file.Close();
+        }
+
+        public void PropagateClose(Command command)
+        {
+            Thread[] pool = new Thread[this.Servers.Count - 1];
+            int i = 0;
+            foreach (KeyValuePair<String, int> entry in this.Servers)
+            {
+                if (this.url != entry.Key)
+                {
+                    string url = entry.Key;
+                    pool[i] = new Thread(() => DoPropagate(url, command));
+                    pool[i].Start();
+                    i++;
+                }
+            }
+        }
+
+        private void DoPropagate(string url, Command command)
+        {
+            ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
+            si.UpdateClose(command, this.url, this.Servers);
         }
 
         public void UpdateServers(Command command)
@@ -527,11 +537,34 @@ namespace Project
                 }
 
                 this.Servers[serverURL]++;
+                command.Execute(this);
+                Monitor.PulseAll(this.Servers);
 
-                Monitor.Pulse(this.Servers);
             }
-            command.Execute(this);
             
+        }
+
+        public void UpdateClose(Command command, string serverURL, Dictionary<string, int> vectorClock)
+        {
+            lock (this.Servers)
+            {
+                Console.WriteLine("Server's own clock");
+                printClock(this.Servers);
+                Console.WriteLine("Received Clock");
+                printClock(vectorClock);
+                while (!checkClock(serverURL, vectorClock))
+                {
+                    Monitor.Wait(this.Servers);
+                }
+
+                this.Servers[serverURL]++;
+
+                lock (this.Closes)
+                {
+                    this.Closes.Add(command.Topic, command);
+                }
+                Monitor.PulseAll(this.Servers);
+            }
         }
 
         private bool checkClock(string serverURL, Dictionary<string, int> vectorClock)
@@ -543,7 +576,7 @@ namespace Project
                 {
                     return false;
                 }
-                else if (serverURL == entry.Key && entry.Value != vectorClock[entry.Key] - 1)
+                else if (serverURL == entry.Key && entry.Value < vectorClock[entry.Key] - 1)
                 {
                     return false;
                 }
@@ -661,12 +694,195 @@ namespace Project
         }
 
 
-        public int GetTicket()
+        public int GetTicket(string topic, string serverURL, Dictionary<string, int> vectorClock)
         {
-            lock (lockTicket)
+            lock (this.Servers)
             {
-                return ++ticket;
+                lock (this.Tickets)
+                {
+
+                    Console.WriteLine("Server's own clock");
+                    printClock(this.Servers);
+                    Console.WriteLine("Received Clock");
+                    printClock(vectorClock);
+                    while (!checkClock(serverURL, vectorClock))
+                    {
+                        Monitor.Wait(this.Servers);
+                    }
+
+                    ticket++;
+                    this.Tickets.Add(ticket, new Ticket(ticket, serverURL, this.Closes[topic]));
+                    Monitor.PulseAll(this.Servers);
+                    return ticket;
+                }
             }
+        }
+
+        private void PropagateTicket(int ticket, AbstractMeeting am)
+        {
+            lock (this.Servers)
+            {
+                Thread[] pool = new Thread[this.Servers.Count - 1];
+                int i = 0;
+                foreach (KeyValuePair<String, int> entry in this.Servers)
+                {
+                    if (this.url != entry.Key)
+                    {
+                        string url = entry.Key;
+                        pool[i] = new Thread(() => DoPropagateTicket(url, ticket, am));
+                        pool[i].Start();
+                        i++;
+                    }
+                }
+            }
+        }
+
+        private void DoPropagateTicket(string url, int ticket, AbstractMeeting am)
+        {
+            ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
+            si.ReceiveTicketResult(am.Topic, this.url, ticket, am, this.Servers);
+        }
+
+        public void ReceiveTicketResult(string topic, string serverURL, int ticket, AbstractMeeting am, Dictionary<string, int> vectorClock)
+        {
+            List<Command> pendingJoins = new List<Command>();
+            lock (this.Servers)
+            {
+                Console.WriteLine("Server's own clock");
+                printClock(this.Servers);
+                Console.WriteLine("Received Clock");
+                printClock(vectorClock);
+                while (!checkClock(serverURL, vectorClock))
+                {
+                    Monitor.Wait(this.Servers);
+                }
+
+                this.Servers[serverURL]++;
+
+
+                lock (this.Tickets)
+                {
+                    while (ticket - 1 != lastTicket)
+                    {
+                        Monitor.Wait(this.Tickets);
+                    }
+                    Monitor.PulseAll(this.Tickets);
+                }
+                lock (this.Proposals)
+                {
+                    lock (this.Meetings)
+                    {
+                        lock (this.Tickets)
+                        {
+                            lock (this.Closes)
+                            {
+                                if (am.isProposal())
+                                {
+                                    this.Proposals[topic] = (Proposal)am;
+                                }
+                                else
+                                {
+                                    Meeting m = (Meeting)am;
+                                    this.Meetings[m.Slot.Location.Local].addMeeting(m);
+                                    Proposal p = this.Proposals[topic];
+                                    this.Proposals.Remove(topic);
+
+                                    foreach (Attendee a in p.Attendees)
+                                    {
+                                        bool notIn = true;
+                                        foreach (Attendee attendee in m.Attendees)
+                                        {
+                                            if (attendee.Name == a.Name)
+                                            {
+                                                notIn = false;
+                                            }
+                                        }
+                                        if (notIn && CouldAttend(m, a))
+                                        {
+                                            List<string> slots = new List<string>();
+                                            foreach (Slot s in a.Available_slots)
+                                            {
+                                                slots.Add(s.Location + "," + s.Date);
+                                            }
+                                            Command command = new DoJoin(topic + a.Name, a.Name, slots);
+                                            pendingJoins.Add(command);
+                                        }
+
+                                    }
+                                }
+                                if (this.masterServer != this.url)
+                                {
+                                    this.Tickets.Add(ticket, new Ticket(ticket, serverURL, this.Closes[topic]));
+                                }
+                                this.Closes.Remove(topic);
+                                lastTicket++;
+                                foreach (Command command in pendingJoins)
+                                {
+                                    ExecuteTicket(command);
+                                }
+                            }
+                        }
+                    }
+                }
+                Monitor.PulseAll(this.Servers);
+
+            }
+        }
+
+        private Boolean CouldAttend(Meeting m, Attendee user)
+        {
+            if(m.N_invitees == m.SelectedRoom.Capacity)
+            {
+                return false;
+            }
+            Slot chosenSlot = m.Slot;
+            foreach (Slot s in user.Available_slots)
+            {
+                if ((s.Date == chosenSlot.Date && s.Location.Local == chosenSlot.Location.Local))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void ExecuteTicket(Command command)
+        {
+            string topic = command.Topic;
+            
+            this.Closes.Add(topic, command);
+            this.Servers[this.url]++;
+            PropagateClose(command);
+
+            int newTicket;
+            if (masterServer == this.url)
+            {
+                newTicket = GetTicket(topic, this.url, this.Servers);
+            }
+            else
+            {
+                ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), masterServer);
+                newTicket = si.GetTicket(topic, this.url, this.Servers);
+
+                this.Tickets.Add(newTicket, new Ticket(newTicket, this.url, this.Closes[topic]));
+            }
+
+            
+            while (newTicket - 1 != lastTicket)
+            {
+                Monitor.Wait(this.Tickets);
+            }
+            
+
+            
+            AbstractMeeting am = command.Execute(this);
+            this.Servers[this.url]++;
+            lastTicket++;
+            this.Closes.Remove(topic);
+                   
+            PropagateTicket(newTicket, am);
+
+            Monitor.PulseAll(this.Tickets);
         }
 
 

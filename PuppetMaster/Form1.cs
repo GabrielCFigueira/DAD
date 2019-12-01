@@ -127,7 +127,7 @@ namespace PuppetMaster
         }
     }
 
-    public class PuppetMasterImp : MarshalByRefObject, IPuppet
+    public class PuppetMasterImp : MarshalByRefObject
     {
         private List<Uri> pcsList;
         private Dictionary<string, Uri> serverDict;
@@ -197,12 +197,12 @@ namespace PuppetMaster
             switch (commands[0])
             {
                 case "Server":
-                    CreateServerDelegate serverDelegate = new CreateServerDelegate(createServer);
-                    serverDelegate.BeginInvoke(commands[1], commands[2], commands[3], commands[4], commands[5], "tcp://localhost:10001/PuppetMaster", masterServer, null, null);
-                    if(masterServer == "1")
+                    if (masterServer == "1")
                     {
                         masterServer = commands[2];
                     }
+                    CreateServerDelegate serverDelegate = new CreateServerDelegate(createServer);
+                    serverDelegate.BeginInvoke(commands[1], commands[2], commands[3], commands[4], commands[5], "tcp://localhost:10001/PuppetMaster", masterServer, null, null);
                     return command;
                 case "Client":
                     CreateClientDelegate clientDelegate = new CreateClientDelegate(createClient);
@@ -271,30 +271,5 @@ namespace PuppetMaster
             return serverDict; 
         }
 
-        //Se calhar nao preciso disto para a interface do Puppet
-        public void AddRoom(String location, int capacity, String room_name, Uri uri)
-        {
-            throw new NotImplementedException();
-        }
-        //Nao preciso disto para a interface do Puppet
-        public void Status(string status)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Crash(string server_id)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Freeze(string server_id)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Unfreeze(string server_id)
-        {
-            throw new NotImplementedException();
-        }
     }
 }

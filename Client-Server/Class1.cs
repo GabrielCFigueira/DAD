@@ -33,21 +33,66 @@ namespace Project
 
         void JoinMeeting(String topic, String userName, List<String> slots);
 
-        void CloseMeeting(String userName,String topic);
+        void CloseMeeting(String userName, String topic);
 
-        void Connect(String URL,String userName);
+        void Connect(String URL, String userName);
 
         void UpdateMeeting(Command command, string serverURL, Dictionary<string, int> vectorClock);
 
-        void UpdateClient(String client_url,String userName);
+        void UpdateClose(Command command, string serverURL, Dictionary<string, int> vectorClock);
 
-        int GetTicket();
+        void UpdateClient(String client_url, String userName);
+
+        int GetTicket(string topic, string serverURL, Dictionary<string, int> vectorClock);
+
+        void ReceiveTicketResult(string topic, string serverURL, int ticket, AbstractMeeting am, Dictionary<string, int> vectorClock);
+
     }
 
     [Serializable]
     public abstract class Command
     {
+        private string topic;
+
+        public Command(string topic)
+        {
+            this.topic = topic;
+        }
+
+        public string Topic
+        {
+            get { return topic;  }
+        }
         public abstract AbstractMeeting Execute(ServerInterface si);
+    }
+
+    public class Ticket
+    {
+        private int id;
+        private string serverURL;
+        private Command command;
+
+        public Ticket(int id, string serverURL, Command command)
+        {
+            this.id = id;
+            this.serverURL = serverURL;
+            this.command = command;
+        }
+
+        public int Id
+        {
+            get { return id; }
+        }
+
+        public string ServerURL
+        {
+            get { return serverURL; }
+        }
+
+        public Command Command
+        {
+            get { return command; }
+        }
     }
 
     [Serializable]
