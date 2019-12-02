@@ -210,7 +210,7 @@ namespace Project
             this.Meetings.Add(p.Topic, p);
         }
 
-        public void Gossip(Proposal p, int actualRound, int totalRounds)
+        public void Gossip(Proposal p, int actualRound, int totalRounds, int numberOfMessages)
         {
             this.ClientsSent = new Dictionary<String, String>();
             Console.WriteLine("Comecei o Gossip");
@@ -246,17 +246,16 @@ namespace Project
                 }
             }
 
-            int numberOfMessages = 2;
             Console.WriteLine("Vou mandar " + numberOfMessages + " mensagens");
             Thread[] pool = new Thread[numberOfMessages];
             for (int i = 0; i < numberOfMessages; i++)
             {
-                pool[i] = new Thread(() => DoSpreadMessage(p, actualRound, totalRounds));
+                pool[i] = new Thread(() => DoSpreadMessage(p, actualRound, totalRounds, numberOfMessages));
                 pool[i].Start();
             }
         }
 
-        public void DoSpreadMessage(Proposal p, int actualRound, int totalRounds)
+        public void DoSpreadMessage(Proposal p, int actualRound, int totalRounds, int numberOfMessages)
         {
             ServerInterface s = this.Server;
             var chosenClientNameAndURL = s.getRandomClientName();
@@ -272,7 +271,7 @@ namespace Project
 
             Console.WriteLine("Mandei ao/a " + chosenClientNameAndURL);
             ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), chosenClientNameAndURL.Item2);
-            chosenClient.Gossip(p, actualRound + 1, totalRounds);
+            chosenClient.Gossip(p, actualRound + 1, totalRounds, numberOfMessages);
         }
 
         public void UpdateMeetings(Dictionary<string, Proposal> proposals, Dictionary<string, LocationMeetings> meetings)

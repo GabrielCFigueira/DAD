@@ -349,10 +349,12 @@ namespace Project
             }
             UpdateServers(command);
             ClientInterface c = this.Clients[coordinator];
-            int totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2));
+            Console.WriteLine("Tenho " + this.Clients.Count + " clientes");
+            int numberOfMessages = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2));
+            int totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, numberOfMessages));
             totalRounds += 2; //this is for gossip
             //c.AddProposal(p);
-            c.Gossip(p,1,totalRounds);
+            c.Gossip(p,1,totalRounds,numberOfMessages);
             /*if (n_invitees > 0)
             {
                 foreach (String s in invitees)

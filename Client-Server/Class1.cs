@@ -23,7 +23,7 @@ namespace Project
 
         void UpdateMeetings(Dictionary<String, Proposal> proposals, Dictionary<string, LocationMeetings> meetings);
 
-        void Gossip(Proposal p, int actualRound, int totalRounds);
+        void Gossip(Proposal p, int actualRound, int totalRounds, int numberOfMessages);
 
         void UpdateUsers(Dictionary<String,String> clients);
 
