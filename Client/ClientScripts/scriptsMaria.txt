@@ -1,4 +1,4 @@
-create Pokemon 1 1 2 Lisboa,15-05-19 Joao Ze
+create Pokemon 1 1 0 Lisboa,15-05-19
 list
 join Pokemon 1 Lisboa,15-05-19
 list

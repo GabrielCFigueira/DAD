@@ -23,7 +23,7 @@ namespace Project
 
         void UpdateMeetings(Dictionary<String, Proposal> proposals, Dictionary<string, LocationMeetings> meetings);
 
-        void Gossip(Proposal p, int actualRound);
+        void Gossip(Proposal p, int actualRound, int totalRounds);
 
         void UpdateUsers(Dictionary<String,String> clients);
 
@@ -46,6 +46,8 @@ namespace Project
         void UpdateClient(String client_url,String userName);
 
         int GetTicket();
+
+        (String,String) getRandomClientName();
     }
 
     [Serializable]

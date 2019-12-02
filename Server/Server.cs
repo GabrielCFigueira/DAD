@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.Remoting;
 using System.Runtime.Remoting.Channels;
 using System.Runtime.Remoting.Channels.Tcp;
@@ -348,8 +349,10 @@ namespace Project
             }
             UpdateServers(command);
             ClientInterface c = this.Clients[coordinator];
+            int totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2));
+            totalRounds += 2; //this is for gossip
             //c.AddProposal(p);
-            c.Gossip(p,1);
+            c.Gossip(p,1,totalRounds);
             /*if (n_invitees > 0)
             {
                 foreach (String s in invitees)
@@ -416,17 +419,26 @@ namespace Project
                     Clients.Add(userName, c);
                     ClientsURLS.Add(userName, client_URL);
 
-                    foreach (KeyValuePair<String, ClientInterface> entry in this.Clients)
+                    /*foreach (KeyValuePair<String, ClientInterface> entry in this.Clients)
                     {
                         ClientInterface ci = entry.Value;
                         //ci.UpdateUsers(this.Clients);
                         ci.UpdateUsers(this.ClientsURLS);
-                    }
+                    }*/
                 }
             }
             Console.WriteLine("Registei o/a cliente " + userName);
 
 
+        }
+
+        public (String,String) getRandomClientName()
+        {
+            List<String> listClientNames = this.ClientsURLS.Keys.ToList();
+            Random random = new Random();
+            int randomIndex = random.Next(listClientNames.Count);
+            String chosenClientName = listClientNames[randomIndex];
+            return (chosenClientName,this.ClientsURLS[chosenClientName]);
         }
 
         public void InitializeLocationsAndRooms()

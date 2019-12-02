@@ -210,12 +210,15 @@ namespace Project
             this.Meetings.Add(p.Topic, p);
         }
 
-        public void Gossip(Proposal p, int actualRound)
+        public void Gossip(Proposal p, int actualRound, int totalRounds)
         {
             this.ClientsSent = new Dictionary<String, String>();
             Console.WriteLine("Comecei o Gossip");
-            int totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2));
-            totalRounds += 2; //just to be sure that everyone gets the message
+            foreach (KeyValuePair<String, String> entry in this.Clients)
+            {
+                Console.WriteLine(entry.Value);
+            }
+
             Console.WriteLine("Actual Round: " + actualRound);
             Console.WriteLine("Total rounds: " + totalRounds);
 
@@ -234,7 +237,7 @@ namespace Project
                 if (p2 == null && am.N_invitees == 0)
                 {
                     Console.WriteLine("Este proposal é aberta, sou o/a " + this.UserName + " e passei a conhecer a meeting com o Topic " + am.Topic);
-                    this.Meetings.Add(am.Topic, am); //WHY DOES THIS FAIL
+                    this.Meetings.Add(am.Topic, am);
                 }
                 else if (p2 == null && am.N_invitees != 0 && (am.Invitees.Contains(this.UserName) || this.UserName == am.Coordinator))
                 {
@@ -248,36 +251,28 @@ namespace Project
             Thread[] pool = new Thread[numberOfMessages];
             for (int i = 0; i < numberOfMessages; i++)
             {
-                pool[i] = new Thread(() => DoSpreadMessage(p, actualRound));
+                pool[i] = new Thread(() => DoSpreadMessage(p, actualRound, totalRounds));
                 pool[i].Start();
             }
         }
 
-        public void DoSpreadMessage(Proposal p, int actualRound)
+        public void DoSpreadMessage(Proposal p, int actualRound, int totalRounds)
         {
-            String chosenClientName = getRandomClientName(this.Clients);
+            ServerInterface s = this.Server;
+            var chosenClientNameAndURL = s.getRandomClientName();
             lock (this.ClientsSent)
             {
-                while (chosenClientName == this.UserName || this.ClientsSent.ContainsKey(chosenClientName))
+                while (chosenClientNameAndURL.Item1 == this.UserName || this.ClientsSent.ContainsKey(chosenClientNameAndURL.Item1))
                 {
-                    chosenClientName = getRandomClientName(this.Clients);
+                    chosenClientNameAndURL = s.getRandomClientName();
                 }
 
-                this.ClientsSent.Add(chosenClientName, this.Clients[chosenClientName]);
+                this.ClientsSent.Add(chosenClientNameAndURL.Item1, chosenClientNameAndURL.Item2);
             }
 
-            Console.WriteLine("Mandei ao/a " + chosenClientName);
-            ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), this.Clients[chosenClientName]);
-            chosenClient.Gossip(p, actualRound + 1);
-        }
-
-        public String getRandomClientName(Dictionary<String,String> clientsToSend)
-        {
-            List<String> listClientNames = clientsToSend.Keys.ToList();
-            Random random = new Random();
-            int randomIndex = random.Next(listClientNames.Count);
-            String chosenClientName = listClientNames[randomIndex];
-            return chosenClientName;
+            Console.WriteLine("Mandei ao/a " + chosenClientNameAndURL);
+            ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), chosenClientNameAndURL.Item2);
+            chosenClient.Gossip(p, actualRound + 1, totalRounds);
         }
 
         public void UpdateMeetings(Dictionary<string, Proposal> proposals, Dictionary<string, LocationMeetings> meetings)
