@@ -44,7 +44,7 @@ namespace Project
         Dictionary<String, LocationMeetings> Meetings;
         Dictionary<String, int> Servers;
         Dictionary<String, Command> Closes;
-        Dictionary<int, Ticket> Tickets;
+        Dictionary<string, Ticket> Tickets;
 
         string id;
         String url;
@@ -121,10 +121,9 @@ namespace Project
                 lock (server.Proposals)
                 {
                     AbstractMeeting am = null;
-
                     if (!server.Proposals.ContainsKey(this.Topic))
                     {
-                        Console.WriteLine("O cliente " + userName + " fez join a uma Meeting ja fechada");
+                        Console.WriteLine("O cliente " + userName + " fez join atrasado a uma Meeting ja fechada");
                         foreach (LocationMeetings lm in server.Meetings.Values)
                         {
                             foreach (Meeting m in lm.Meetings)
@@ -132,7 +131,12 @@ namespace Project
                                 if (m.Topic == this.Topic)
                                 {
                                     am = m;
-                                    goto label;
+                                    if (am.Attendees.Count == m.SelectedRoom.Capacity)
+                                    {
+                                        Console.WriteLine("Mas não há espaço suficiente");
+                                        return am;
+                                    }
+                                        goto label;
                                 }
                             }
                         }
@@ -141,15 +145,14 @@ namespace Project
                     {
                         am = server.Proposals[this.Topic];
                     }
+
                     label:
-                    
                     List<Slot> Slots = new List<Slot>();
                     if ((am.N_invitees != 0 && am.Invitees.Contains(userName)) || am.N_invitees == 0 || am.Coordinator == userName)
                     {
                         foreach (String s in slots)
                         {
                             string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
-
                             Location l = server.Meetings[zone_date[0]].Location;
                             Slot slot = new Slot(l, zone_date[1]);
                             if(am.isProposal())
@@ -160,6 +163,10 @@ namespace Project
                         }
 
                         Attendee a = new Attendee(userName, Slots);
+                        if(!am.isProposal())
+                        {
+                            a.LateArrival = true;
+                        }
                         am.Version += 1;
                         am.Attendees.Add(a);
                     }
@@ -300,7 +307,7 @@ namespace Project
             this.Servers = new Dictionary<string, int>();
             this.Servers.Add(url, 0);
             this.Closes = new Dictionary<string, Command>();
-            this.Tickets = new Dictionary<int, Ticket>();
+            this.Tickets = new Dictionary<string, Ticket>();
 
             this.puppetURL = puppetURL;
             this.masterServer = masterServer;
@@ -328,7 +335,7 @@ namespace Project
                     lock (this.Closes)
                     {
                         Command command = new DoClose(userName, topic);
-                        ExecuteTicket(command);
+                        ExecuteTicket(command, "");
                     }
                 }
             }
@@ -375,20 +382,32 @@ namespace Project
         public void JoinMeeting(String topic, String userName, List<String> slots)
         {
             //this.waitBetweenRequests();
-            if(!this.Proposals.ContainsKey(topic) && false) //FIXME pending create?
+            if(!this.Proposals.ContainsKey(topic)) //FIXME pending create?
             {
-                Console.WriteLine("no such proposal");
-                return; //FIXME failure
+                lock (this.Servers)
+                {
+                    lock (this.Tickets)
+                    {
+                        lock (this.Closes)
+                        {
+                            Command command = new DoJoin(topic, userName, slots);
+                            ExecuteTicket(command, userName);
+                        }
+                    }
+                }
             }
-            Command command = new DoJoin(topic, userName, slots);
-            lock (this.Servers)
+            else
             {
-                command.Execute(this);
-                this.Servers[this.url]++;
-            }
-            this.waitBetweenRequests();
-            UpdateServers(command);
+                Command command = new DoJoin(topic, userName, slots);
+                //this.waitBetweenRequests();
+                lock (this.Servers)
+                {
+                    command.Execute(this);
+                    this.Servers[this.url]++;
 
+                    UpdateServers(command);
+                }
+            }
         }
 
         public void ListMeetings(String userName)
@@ -455,26 +474,27 @@ namespace Project
             file.Close();
         }
 
-        public void PropagateClose(Command command)
+        public void PropagateClose(Command command, string topic)
         {
             Thread[] pool = new Thread[this.Servers.Count - 1];
             int i = 0;
+            Dictionary<string, int> vectorClock = new Dictionary<string, int>(this.Servers);
             foreach (KeyValuePair<String, int> entry in this.Servers)
             {
                 if (this.url != entry.Key)
                 {
                     string url = entry.Key;
-                    pool[i] = new Thread(() => DoPropagate(url, command));
+                    pool[i] = new Thread(() => DoPropagate(url, command, topic, vectorClock));
                     pool[i].Start();
                     i++;
                 }
             }
         }
 
-        private void DoPropagate(string url, Command command)
+        private void DoPropagate(string url, Command command, string topic, Dictionary<string, int> vectorClock)
         {
             ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-            si.UpdateClose(command, this.url, this.Servers);
+            si.UpdateClose(command, topic, this.url, vectorClock);
         }
 
         public void UpdateServers(Command command)
@@ -483,12 +503,14 @@ namespace Project
             {
                 Thread[] pool = new Thread[this.Servers.Count - 1];
                 int i = 0;
-                foreach(KeyValuePair<String, int> entry in this.Servers)
+                Dictionary<string, int> vectorClock = new Dictionary<string, int>(this.Servers);
+                this.waitBetweenRequests();
+                foreach (KeyValuePair<String, int> entry in this.Servers)
                 {
                     if (this.url != entry.Key)
                     {
                         string url = entry.Key;
-                        pool[i] = new Thread(() => DoUpdate(url, command));
+                        pool[i] = new Thread(() => DoUpdate(url, command, vectorClock));
                         pool[i].Start();
                         i++;
                     }
@@ -496,10 +518,10 @@ namespace Project
             }
         }
 
-        private void DoUpdate(string url, Command command)
+        private void DoUpdate(string url, Command command, Dictionary<string, int> vectorClock)
         {
             ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-            si.UpdateMeeting(command, this.url, this.Servers);
+            si.UpdateMeeting(command, this.url, vectorClock);
         }
 
         public void UpdateServersClients(String clientUrl, String userName)
@@ -546,11 +568,8 @@ namespace Project
         {
             lock(this.Servers)
             {
-                Console.WriteLine("Server's own clock");
-                printClock(this.Servers);
-                Console.WriteLine("Received Clock");
-                printClock(vectorClock);
-                while(!checkClock(serverURL, vectorClock))
+                printClocks(serverURL, vectorClock, this.Servers);
+                while (!checkClock(serverURL, vectorClock))
                 {
                     Monitor.Wait(this.Servers);
                 }
@@ -563,14 +582,11 @@ namespace Project
             
         }
 
-        public void UpdateClose(Command command, string serverURL, Dictionary<string, int> vectorClock)
+        public void UpdateClose(Command command, string topic, string serverURL, Dictionary<string, int> vectorClock)
         {
             lock (this.Servers)
             {
-                Console.WriteLine("Server's own clock");
-                printClock(this.Servers);
-                Console.WriteLine("Received Clock");
-                printClock(vectorClock);
+                printClocks(serverURL, vectorClock, this.Servers);
                 while (!checkClock(serverURL, vectorClock))
                 {
                     Monitor.Wait(this.Servers);
@@ -580,7 +596,7 @@ namespace Project
 
                 lock (this.Closes)
                 {
-                    this.Closes.Add(command.Topic, command);
+                    this.Closes.Add(topic, command);
                 }
                 Monitor.PulseAll(this.Servers);
             }
@@ -601,14 +617,6 @@ namespace Project
                 }
             }
             return true;
-        }
-
-        private void printClock(Dictionary<string, int> vectorClock)
-        {
-            foreach (KeyValuePair<string, int> entry in vectorClock)
-            {
-                Console.WriteLine("Server: " + entry.Key + " Clock: " + entry.Value);
-            }
         }
 
         public void AddServer(String serverURL)
@@ -712,43 +720,62 @@ namespace Project
             Environment.Exit(0);
         }
 
+        private void printClocks(string serverURL, Dictionary<string, int> clock1, Dictionary<string, int> clock2)
+        {
+            Console.WriteLine("\r\nClock from " + serverURL + "\r\n");
+            string value = "";
+            foreach (KeyValuePair<string, int> entry in clock1)
+            {
+                if(!clock2.ContainsKey(entry.Key))
+                {
+                    value = "#";
+                }
+                else
+                {
+                    value = clock2[entry.Key] + "";
+                }
+                Console.WriteLine(entry.Key + ": " + value + " " + entry.Value);
+            }
+        }
+
 
         public int GetTicket(string topic, string serverURL, Dictionary<string, int> vectorClock)
         {
             lock (this.Servers)
             {
-                lock (this.Tickets)
+                printClocks(serverURL, vectorClock, this.Servers);
+                while (!checkClock(serverURL, vectorClock))
                 {
+                    Monitor.Wait(this.Servers);
+                }
 
-                    Console.WriteLine("Server's own clock");
-                    printClock(this.Servers);
-                    Console.WriteLine("Received Clock");
-                    printClock(vectorClock);
-                    while (!checkClock(serverURL, vectorClock))
+                lock(this.Tickets) { 
+
+                    if(this.Tickets.ContainsKey(topic))
                     {
-                        Monitor.Wait(this.Servers);
+                        return 0; //default value for already existing tickets FIXME fault tolerance
                     }
-
                     ticket++;
-                    this.Tickets.Add(ticket, new Ticket(ticket, serverURL, this.Closes[topic]));
+                    this.Tickets.Add(topic, new Ticket(ticket, serverURL, this.Closes[topic]));
                     Monitor.PulseAll(this.Servers);
                     return ticket;
                 }
             }
         }
 
-        private void PropagateTicket(int ticket, AbstractMeeting am)
+        private void PropagateTicket(int ticket, string topic, AbstractMeeting am)
         {
             lock (this.Servers)
             {
                 Thread[] pool = new Thread[this.Servers.Count - 1];
                 int i = 0;
+                Dictionary<string, int> vectorClock = new Dictionary<string, int>(this.Servers);
                 foreach (KeyValuePair<String, int> entry in this.Servers)
                 {
                     if (this.url != entry.Key)
                     {
                         string url = entry.Key;
-                        pool[i] = new Thread(() => DoPropagateTicket(url, ticket, am));
+                        pool[i] = new Thread(() => DoPropagateTicket(url, ticket, topic, am, vectorClock));
                         pool[i].Start();
                         i++;
                     }
@@ -756,21 +783,18 @@ namespace Project
             }
         }
 
-        private void DoPropagateTicket(string url, int ticket, AbstractMeeting am)
+        private void DoPropagateTicket(string url, int ticket, string topic, AbstractMeeting am, Dictionary<string, int> vectorClock)
         {
             ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-            si.ReceiveTicketResult(am.Topic, this.url, ticket, am, this.Servers);
+            si.ReceiveTicketResult(topic, this.url, ticket, am, vectorClock);
         }
 
         public void ReceiveTicketResult(string topic, string serverURL, int ticket, AbstractMeeting am, Dictionary<string, int> vectorClock)
         {
-            List<Command> pendingJoins = new List<Command>();
+            Dictionary<string, Command> pendingJoins = new Dictionary<string, Command>();
             lock (this.Servers)
             {
-                Console.WriteLine("Server's own clock");
-                printClock(this.Servers);
-                Console.WriteLine("Received Clock");
-                printClock(vectorClock);
+                printClocks(serverURL, vectorClock, this.Servers);
                 while (!checkClock(serverURL, vectorClock))
                 {
                     Monitor.Wait(this.Servers);
@@ -803,9 +827,24 @@ namespace Project
                                 {
                                     Meeting m = (Meeting)am;
                                     this.Meetings[m.Slot.Location.Local].addMeeting(m);
-                                    Proposal p = this.Proposals[topic];
-                                    this.Proposals.Remove(topic);
-                                    Console.WriteLine("atention!");
+                                    AbstractMeeting p = null;
+                                    if (this.Proposals.ContainsKey(topic))
+                                    {
+                                        p = this.Proposals[topic];
+                                        this.Proposals.Remove(topic);
+                                    }
+                                    else
+                                    {
+                                        foreach(Meeting meeting in this.Meetings[m.Slot.Location.Local].Meetings)
+                                        {
+                                            if(meeting.Topic == m.Topic)
+                                            {
+                                                p = meeting;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    
                                     foreach (Attendee a in p.Attendees)
                                     {
                                         bool notIn = true;
@@ -822,23 +861,24 @@ namespace Project
                                             List<string> slots = new List<string>();
                                             foreach (Slot s in a.Available_slots)
                                             {
-                                                slots.Add(s.Location + "," + s.Date);
+                                                slots.Add(s.Location.Local + "," + s.Date);
                                             }
-                                            Command command = new DoJoin(topic + a.Name, a.Name, slots);
-                                            pendingJoins.Add(command);
+                                            Command command = new DoJoin(topic, a.Name, slots);
+                                            pendingJoins.Add(a.Name, command);
                                         }
 
                                     }
                                 }
+                                
                                 if (this.masterServer != this.url)
                                 {
-                                    this.Tickets.Add(ticket, new Ticket(ticket, serverURL, this.Closes[topic]));
+                                    this.Tickets.Add(topic, new Ticket(ticket, serverURL, this.Closes[topic]));
                                 }
                                 this.Closes.Remove(topic);
                                 lastTicket++;
-                                foreach (Command command in pendingJoins)
+                                foreach (KeyValuePair<string, Command> entry in pendingJoins)
                                 {
-                                    ExecuteTicket(command);
+                                    ExecuteTicket(entry.Value, entry.Key);
                                 }
                             }
                         }
@@ -851,7 +891,7 @@ namespace Project
 
         private Boolean CouldAttend(Meeting m, Attendee user)
         {
-            if(m.Attendees.Count == m.SelectedRoom.Capacity)
+            if (m.Attendees.Count == m.SelectedRoom.Capacity)
             {
                 return false;
             }
@@ -866,43 +906,55 @@ namespace Project
             return false;
         }
 
-        private void ExecuteTicket(Command command)
+        private void ExecuteTicket(Command command, string userName)
         {
-            string topic = command.Topic;
+            string topic = command.Topic + userName;
             
             this.Closes.Add(topic, command);
             this.Servers[this.url]++;
-            PropagateClose(command);
-
+            PropagateClose(command, topic);
+             
             int newTicket;
             if (masterServer == this.url)
             {
                 newTicket = GetTicket(topic, this.url, this.Servers);
+                if(newTicket == 0)
+                {
+                    return;
+                }
             }
             else
             {
                 ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), masterServer);
                 newTicket = si.GetTicket(topic, this.url, this.Servers);
-
-                this.Tickets.Add(newTicket, new Ticket(newTicket, this.url, this.Closes[topic]));
+                if (newTicket == 0)
+                {
+                    return;
+                }
+                this.Tickets.Add(topic, new Ticket(newTicket, this.url, this.Closes[topic]));
             }
 
-            
+
+
             while (newTicket - 1 != lastTicket)
             {
                 Monitor.Wait(this.Tickets);
             }
-            
 
-            
+            Console.WriteLine("Executing ticket " + newTicket + " " + topic);
+
+
+
+
             AbstractMeeting am = command.Execute(this);
             this.Servers[this.url]++;
             lastTicket++;
             this.Closes.Remove(topic);
-                   
-            PropagateTicket(newTicket, am);
+
+            PropagateTicket(newTicket, topic, am);
 
             Monitor.PulseAll(this.Tickets);
+            
         }
 
 

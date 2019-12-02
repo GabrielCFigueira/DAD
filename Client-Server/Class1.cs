@@ -39,7 +39,7 @@ namespace Project
 
         void UpdateMeeting(Command command, string serverURL, Dictionary<string, int> vectorClock);
 
-        void UpdateClose(Command command, string serverURL, Dictionary<string, int> vectorClock);
+        void UpdateClose(Command command, string topic, string serverURL, Dictionary<string, int> vectorClock);
 
         void UpdateClient(String client_url, String userName);
 
@@ -256,16 +256,22 @@ namespace Project
             {
                 message += s + " ";
             }
-            message += "\r\nAttendees: ";
+            message += "\r\nAttendees:\r\n";
             foreach (Attendee a in this.Attendees)
             {
-                message += a.Name + ", Available Slots: ";
+                message += "\t" + a.Name;
+                if (a.LateArrival)
+                {
+                    message += "(joined late)";
+                }
+                message += ", Available Slots: ";
                 foreach (Slot s in a.Available_slots)
                 {
                     message += s.Location.Local + "," + s.Date + " ";
                 }
+                message += "\r\n";
             }
-            message += "\r\nSelected Room: " + this.SelectedRoom.Name + "\r\n";
+            message += "Selected Room: " + this.SelectedRoom.Name + "\r\n";
             return message;
         }
     }
@@ -275,6 +281,7 @@ namespace Project
     {
         String name;
         List<Slot> available_slots;
+        bool lateArrival = false;
 
         public Attendee(String Name, List<Slot> Available_slots)
         {
@@ -292,6 +299,12 @@ namespace Project
         {
             get { return available_slots; }
             set { available_slots = value; }
+        }
+
+        public bool LateArrival
+        {
+            get { return lateArrival; }
+            set { lateArrival = value; }
         }
     }
 
@@ -352,14 +365,20 @@ namespace Project
             }
             else
             {
-                message += "\r\nAttendees: ";
+                message += "\r\nAttendees:\r\n";
                 foreach (Attendee a in this.Attendees)
                 {
-                    message += a.Name + ", Available Slots: ";
+                    message += "\t" + a.Name;
+                    if(a.LateArrival)
+                    {
+                        message += "(joined late)";
+                    }
+                    message += ", Available Slots: ";
                     foreach (Slot s in a.Available_slots)
                     {
                         message += s.Location.Local + "," + s.Date + " ";
                     }
+                    message += "\r\n";
                 }
                 message += "\r\n";
             }
