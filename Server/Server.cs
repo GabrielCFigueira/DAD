@@ -57,9 +57,17 @@ namespace Project
         Int32 ticket = 0;
         Int32 lastTicket = 0;
 
+        //Reliable_BroadCast structures
+        Dictionary<string, List<string>> acks; //Key: depends on command, values: list of servers
+        List<string> received_commands;
+
+        //Freeze and Unfreeze variable
+        bool freeze = false;
+
         [Serializable]
         private class DoCreate : Command
         {
+            string command_id;
             string coordinator;
             int min_attendees;
             int n_slots;
@@ -76,6 +84,7 @@ namespace Project
                 this.n_invitees = n_invitees;
                 this.slots = slots;
                 this.invitees = invitees;
+                this.command_id = topic + "Create";  //id Create
             }
 
             override public AbstractMeeting Execute(ServerInterface si)
@@ -101,11 +110,17 @@ namespace Project
                     }
                 }
             }
+
+            override public string getCommandId()
+            {
+                return this.command_id;
+            }
         }
 
         [Serializable]
         private class DoJoin : Command
         {
+            string command_id;
             string userName;
             List<string> slots;
             public DoJoin(string topic, string userName, List<string> slots)
@@ -113,6 +128,7 @@ namespace Project
             {
                 this.userName = userName;
                 this.slots = slots;
+                this.command_id = topic +  userName;
             }
 
             override public AbstractMeeting Execute(ServerInterface si)
@@ -179,17 +195,24 @@ namespace Project
 
                 }
             }
+
+            override public string getCommandId()
+            {
+                return this.command_id;
+            }
         }
 
         [Serializable]
         private class DoClose : Command
         {
+            string command_id;
             string userName;
 
             public DoClose(String userName, String topic)
                 : base(topic)
             {
                 this.userName = userName;
+                this.command_id = topic;
             }
 
             override public AbstractMeeting Execute(ServerInterface si)
@@ -291,6 +314,11 @@ namespace Project
                     }
                 }
             }
+
+            override public string getCommandId()
+            {
+                return this.command_id;
+            }
         }
 
 
@@ -311,6 +339,11 @@ namespace Project
 
             this.puppetURL = puppetURL;
             this.masterServer = masterServer;
+
+            //Reliable_Broadcast
+            this.acks = new Dictionary<string, List<string>>();
+            this.received_commands = new List<string>();
+;
         }
 
         public override object InitializeLifetimeService()
@@ -328,8 +361,16 @@ namespace Project
         public void CloseMeeting(String userName, String topic)
         {
             this.waitBetweenRequests();
-            lock (this.Servers)
+
+            lock (this)
             {
+                while (freeze)
+                {
+                    Monitor.Wait(this);
+                }
+                Monitor.PulseAll(this);
+            }
+
                 lock (this.Tickets)
                 {
                     lock (this.Closes)
@@ -345,7 +386,17 @@ namespace Project
         public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
         {
             this.waitBetweenRequests();
-           
+
+            lock (this)
+            {
+                while (freeze)
+                {
+                    Monitor.Wait(this);
+                }
+                Monitor.PulseAll(this);
+            }
+
+
             Command command = new DoCreate(coordinator, topic, min_attendees, n_slots, n_invitees, slots, invitees);
             Proposal p;
             lock (this.Servers)
@@ -353,7 +404,14 @@ namespace Project
                 p = (Proposal)command.Execute(this);
                 this.Servers[this.url]++;
             }
+            
+            lock (received_commands)
+            {
+                received_commands.Add(command.getCommandId());
+            }
+            
             UpdateServers(command);
+            
             if (n_invitees > 0)
             {
                 foreach (String s in invitees)
@@ -381,38 +439,61 @@ namespace Project
 
         public void JoinMeeting(String topic, String userName, List<String> slots)
         {
-            //this.waitBetweenRequests();
-            if(!this.Proposals.ContainsKey(topic)) //FIXME pending create?
+            this.waitBetweenRequests();
+
+            lock (this)
             {
-                lock (this.Servers)
+                while (freeze)
                 {
-                    lock (this.Tickets)
+                    Monitor.Wait(this);
+                }
+                Monitor.PulseAll(this);
+            }
+
+        if (!this.Proposals.ContainsKey(topic)) //FIXME pending create?
+        {
+            lock (this.Servers)
+            {
+                lock (this.Tickets)
+                {
+                    lock (this.Closes)
                     {
-                        lock (this.Closes)
-                        {
-                            Command command = new DoJoin(topic, userName, slots);
-                            ExecuteTicket(command, userName);
-                        }
+                        Command command = new DoJoin(topic, userName, slots);
+                        ExecuteTicket(command, userName);
                     }
                 }
             }
-            else
+        }
+        else
+        {
+            Command command = new DoJoin(topic, userName, slots);
+            //this.waitBetweenRequests();
+            lock (this.Servers)
             {
-                Command command = new DoJoin(topic, userName, slots);
-                //this.waitBetweenRequests();
-                lock (this.Servers)
-                {
-                    command.Execute(this);
-                    this.Servers[this.url]++;
+                command.Execute(this);
+                this.Servers[this.url]++;
 
-                    UpdateServers(command);
-                }
+                UpdateServers(command);
             }
+        }
+
+
+
         }
 
         public void ListMeetings(String userName)
         {
             this.waitBetweenRequests();
+
+            lock (this)
+            {
+                while (freeze)
+                {
+                    Monitor.Wait(this);
+                }
+                Monitor.PulseAll(this);
+            }
+
             lock (this.Proposals)
             {
                 lock (this.Meetings)
@@ -433,6 +514,12 @@ namespace Project
             {
                 Clients.Add(userName, c);
             }
+
+            lock (received_commands)
+            {
+                received_commands.Add(client_URL);
+            }
+
             this.UpdateServersClients(client_URL, userName);
             Console.WriteLine("Registei o/a cliente " + userName);
 
@@ -548,11 +635,60 @@ namespace Project
         {
             ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
             Console.WriteLine("Sou o servidor e vou fazer update com o user " + userName);
-            si.UpdateClient(clientUrl, userName);
+            si.UpdateClient(clientUrl, userName, this.url);
         }
 
-        public void UpdateClient(String client_url,string userName)
+        public void UpdateClient(string client_url, string userName, string serverURL)
         {
+            //Implement Reliable_Broadcast_Client
+            //if command is in acks
+            string id = client_url;
+            lock (acks)
+            {
+                if (acks.ContainsKey(id))
+                {
+                    //adds server to the acks of the message
+                    acks[id].Add(serverURL);
+                }
+                else
+                {
+                    acks.Add(id, new List<string>());
+                    acks[id].Add(serverURL);
+                }
+                Monitor.PulseAll(acks);  //Wake every spleeping thread that are waiting for acks
+            }
+
+            lock (received_commands)
+            {
+                //If not command received broadcast to everyone
+                if (!received_commands.Contains(id))
+                {
+                    received_commands.Add(id);
+                    UpdateServersClients(client_url, userName);
+                }
+                else
+                {
+                    return;
+                }
+            }
+
+            //From this point message will be delivered
+            
+            //For now it's like this
+            int f = 1;   //Number of fails
+            int x = f + 1;
+            lock (acks)
+            {
+                while (acks[id].Count < x)
+                {
+                    Monitor.Wait(acks);
+                }
+                Monitor.PulseAll(acks);
+            }
+            
+            Console.WriteLine("--Causality--");
+            //Causality
+
             lock (this.Clients)
             {
                 ClientInterface ci = (ClientInterface)Activator.GetObject(typeof(ClientInterface), client_url);
@@ -566,24 +702,74 @@ namespace Project
 
         public void UpdateMeeting(Command command, string serverURL, Dictionary<string, int> vectorClock)
         {
-            lock(this.Servers)
+            //Implement Reliable_Broadcast_Servers
+            //if command is in acks
+            string command_id = command.getCommandId();
+            lock (acks)
             {
-                printClocks(serverURL, vectorClock, this.Servers);
-                while (!checkClock(serverURL, vectorClock))
+                if (acks.ContainsKey(command_id))
                 {
-                    Monitor.Wait(this.Servers);
+                    //adds server to the acks of the message
+                    acks[command_id].Add(serverURL);
+                }
+                else
+                {
+                    acks.Add(command_id, new List<string>());
+                    acks[command_id].Add(serverURL);
+                }
+                Monitor.PulseAll(acks);  //Wake every spleeping thread that are waiting for acks
+            }
+
+            lock (received_commands)
+            {
+                //If not command received broadcast to everyone
+                if (!received_commands.Contains(command_id))
+                {
+                    received_commands.Add(command_id);
+                    UpdateServers(command); //FIXME mandar o clock da mensagem
+                }
+                else
+                {
+                    return;
+                }
+            }
+
+            //From this point message will be delivered
+            int f = 1; //Number of fails
+            int x = f + 1;
+            lock (acks)
+            {
+                while (acks[command_id].Count < x)
+                {
+                    Monitor.Wait(acks);
                 }
 
-                this.Servers[serverURL]++;
-                command.Execute(this);
-                Monitor.PulseAll(this.Servers);
-
+                Monitor.PulseAll(acks);
             }
-            
-        }
 
+            Console.WriteLine("Causality");
+            //Causality
+
+            //lock(this.Servers)
+            //{
+            //    Console.WriteLine("Server's own clock");
+            //    printClock(this.Servers);
+            //    Console.WriteLine("Received Clock");
+            //    printClock(vectorClock);
+            //    while(!checkClock(serverURL, vectorClock))
+            //    {
+            //        Monitor.Wait(this.Servers);
+            //    }
+
+            //    this.Servers[serverURL]++;
+
+            //    Monitor.Pulse(this.Servers);
+            //}
+
+            command.Execute(this);
         public void UpdateClose(Command command, string topic, string serverURL, Dictionary<string, int> vectorClock)
         {
+            //FIXME add RB
             lock (this.Servers)
             {
                 printClocks(serverURL, vectorClock, this.Servers);
@@ -600,6 +786,7 @@ namespace Project
                 }
                 Monitor.PulseAll(this.Servers);
             }
+        command.Execute(this);
         }
 
         private bool checkClock(string serverURL, Dictionary<string, int> vectorClock)
@@ -643,6 +830,16 @@ namespace Project
         {
             Console.WriteLine("\n-----STATUS-----\n");
             Console.WriteLine("I'm ALIVE!");
+
+            lock (this)
+            {
+
+                if (freeze)
+                {
+                    Console.WriteLine("But I'm Freezed");
+                }
+            }
+
             Console.WriteLine("Server id: " + id + " Server url: " + url);
             //Console.WriteLine("Maximum Faults: " + maxFaults);
             //Console.WriteLine("Maximum Delay: " +  maxDelay);
@@ -698,14 +895,22 @@ namespace Project
             shutdown();
         }
 
-        public void Freeze(string server_id)
+        public void Freeze()
         {
-            throw new NotImplementedException();
+            lock (this)
+            {
+                freeze = true;
+                Monitor.PulseAll(this);
+            }
         }
 
-        public void Unfreeze(string server_id)
+        public void Unfreeze()
         {
-            throw new NotImplementedException();
+            lock (this)
+            {
+                freeze = false;
+                Monitor.PulseAll(this);
+            }
         }
 
         public void shutdown()
@@ -946,7 +1151,12 @@ namespace Project
 
 
 
-
+            //Before updateServers (reliable broadcast)
+            string command_id = command.getCommandId();
+            lock (received_commands) //Adding my message to my received_commands
+            {
+                received_commands.Add(command_id);
+            }
             AbstractMeeting am = command.Execute(this);
             this.Servers[this.url]++;
             lastTicket++;
@@ -957,7 +1167,6 @@ namespace Project
             Monitor.PulseAll(this.Tickets);
             
         }
-
 
     }
 

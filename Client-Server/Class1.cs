@@ -41,7 +41,7 @@ namespace Project
 
         void UpdateClose(Command command, string topic, string serverURL, Dictionary<string, int> vectorClock);
 
-        void UpdateClient(String client_url, String userName);
+        void UpdateClient(String client_url, String userName, string serverURL);
 
         int GetTicket(string topic, string serverURL, Dictionary<string, int> vectorClock);
 
@@ -63,7 +63,9 @@ namespace Project
         {
             get { return topic;  }
         }
+        string command_id;
         public abstract AbstractMeeting Execute(ServerInterface si);
+        public abstract string getCommandId();
     }
 
     public class Ticket
@@ -380,7 +382,6 @@ namespace Project
                     }
                     message += "\r\n";
                 }
-                message += "\r\n";
             }
             return message;
         }
