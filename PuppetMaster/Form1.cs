@@ -115,7 +115,7 @@ namespace PuppetMaster
 
             string serverID = commands[0];
 
-            PastCommand.Text += "Crashing Server: " + serverID;
+            PastCommand.Text += "Crashing Server: " + serverID + "\r\n";
 
             string url = pmi.getServers()[serverID].AbsoluteUri;
 
@@ -124,6 +124,53 @@ namespace PuppetMaster
 
             //Removes from the server dictionary
             pmi.getServers().Remove(serverID);
+        }
+
+        private void Freeze_Click(object sender, EventArgs e)
+        {
+            string command = CommandBox.Text;
+            CommandBox.Text = "";
+            string[] commands = command.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            if (commands.Length == 0)
+                return;
+            if (commands.Length < 0)
+            {
+                PastCommand.Text += "Invalid Command: \"" + command + "\"\r\n";
+                return;
+            }
+
+            string serverID = commands[0];
+
+            PastCommand.Text += "Freezing Server: " + serverID + "\r\n";
+
+            string url = pmi.getServers()[serverID].AbsoluteUri;
+
+            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), url);
+            server.Freeze();
+        }
+
+        private void Unfreeze_Click(object sender, EventArgs e)
+        {
+            string command = CommandBox.Text;
+            CommandBox.Text = "";
+            string[] commands = command.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            if (commands.Length == 0)
+                return;
+            if (commands.Length < 0)
+            {
+                PastCommand.Text += "Invalid Command: \"" + command + "\"\r\n";
+                return;
+            }
+
+            string serverID = commands[0];
+
+            PastCommand.Text += "Unfreezing Server: " + serverID + "\r\n";
+
+            string url = pmi.getServers()[serverID].AbsoluteUri;
+
+            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), url);
+            server.Unfreeze();
+
         }
     }
 
@@ -136,7 +183,9 @@ namespace PuppetMaster
 
         delegate void CreateServerDelegate(string s1, string s2, string s3, string s4, string s5, string s6, string s7);
         delegate void CreateClientDelegate(string s1, string s2, string s3, string s4);
-
+        delegate void CreateAddRoomDelegate(string s1, int i, string s2);
+        delegate void CreateStatusDelegate();
+        delegate void CreateCrashFreezeUnfreezeDelegate(string s1);
 
 
         public PuppetMasterImp(string pcsHostnameFile, string commandsFile)
@@ -204,16 +253,61 @@ namespace PuppetMaster
                         masterServer = commands[2];
                     }
                     return command;
+
                 case "Client":
                     CreateClientDelegate clientDelegate = new CreateClientDelegate(createClient);
                     clientDelegate.BeginInvoke(commands[1], commands[2], commands[3], commands[4], null, null);
                     return command;
+
+                case "AddRoom":
+                    string location = commands[1];
+                    int capacity = Int32.Parse(commands[2]);
+                    string room_name = commands[3];
+
+                    CreateAddRoomDelegate addRoomDelegate = new CreateAddRoomDelegate(AddRoom);
+                    addRoomDelegate.BeginInvoke(location, capacity, room_name, null, null);
+
+                    return command;
+
+
+                case "Status":
+                    CreateStatusDelegate statusDelegate = new CreateStatusDelegate(Status);
+                    statusDelegate.BeginInvoke(null, null);
+
+                    return command;
+
+                case "Crash":
+                    string serverID = commands[1];
+
+                    CreateCrashFreezeUnfreezeDelegate crashDelegate = new CreateCrashFreezeUnfreezeDelegate(Crash);
+                    crashDelegate.BeginInvoke(serverID, null, null);
+
+                    return command;
+
+                case "Freeze":
+                    string serverID2 = commands[1];
+
+                    CreateCrashFreezeUnfreezeDelegate freezeDelegate = new CreateCrashFreezeUnfreezeDelegate(Freeze);
+                    freezeDelegate.BeginInvoke(serverID2, null, null);
+
+                    return command;
+
+                case "Unfreeze":
+                    string serverID3 = commands[1];
+
+                    CreateCrashFreezeUnfreezeDelegate unfreezeDelegate = new CreateCrashFreezeUnfreezeDelegate(Unfreeze);
+                    unfreezeDelegate.BeginInvoke(serverID3, null, null);
+
+                    return command;
+
                 case "Wait":
                     Thread.Sleep(Int32.Parse(commands[1]));
                     return command;
+
                 case "Shutdown":
                     shutdown();
                     return "Shutdown";
+
                 default:
                     return "Wrong Command";
             }
@@ -266,35 +360,58 @@ namespace PuppetMaster
             Environment.Exit(0);
         }
 
-        public Dictionary<string, Uri> getServers() // Mudar isto para getServers
+        public Dictionary<string, Uri> getServers() 
         {
             return serverDict; 
         }
 
-        //Se calhar nao preciso disto para a interface do Puppet
-        public void AddRoom(String location, int capacity, String room_name, Uri uri)
+   
+        public void AddRoom(String location, int capacity, String room_name)
         {
-            throw new NotImplementedException();
+            foreach (string serverID in serverDict.Keys)
+            {
+                IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), serverDict[serverID].AbsoluteUri);
+                server.AddRoom(location, capacity, room_name);
+            }
         }
-        //Nao preciso disto para a interface do Puppet
-        public void Status(string status)
+        
+        public void Status()
         {
-            throw new NotImplementedException();
-        }
-
-        public void Crash(string server_id)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Freeze(string server_id)
-        {
-            throw new NotImplementedException();
+            foreach (string serverID in serverDict.Keys)
+            {
+                IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), serverDict[serverID].AbsoluteUri);
+                server.Status();
+            }
         }
 
-        public void Unfreeze(string server_id)
+        public void Crash(string serverID)
         {
-            throw new NotImplementedException();
+
+            string url = serverDict[serverID].AbsoluteUri;
+
+            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), url);
+            server.Crash();
+
+            //Removes from the server dictionary
+            serverDict.Remove(serverID);
+
+        }
+
+        public void Freeze(string serverID)
+        {
+            string url = serverDict[serverID].AbsoluteUri;
+
+            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), url);
+            server.Freeze();
+           
+        }
+
+        public void Unfreeze(string serverID)
+        {
+            string url = serverDict[serverID].AbsoluteUri;
+
+            IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), url);
+            server.Unfreeze();
         }
     }
 }
