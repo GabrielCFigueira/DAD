@@ -318,5 +318,36 @@ namespace Project
                 Console.WriteLine(m.PrintInfo());
             }
         }
+
+        public void InitializeMeetings(Dictionary<string, Proposal> proposals, Dictionary<string, LocationMeetings> meetings)
+        {
+            foreach (KeyValuePair<String, Proposal> entry in proposals)
+            {
+                AbstractMeeting p = (AbstractMeeting) entry.Value;
+                Console.WriteLine("Vou ter esta proposal sobre " + p.Topic);
+                lock (this.Meetings)
+                {
+                    if (p.N_invitees == 0 || (p.N_invitees != 0 && (p.Invitees.Contains(this.UserName) || this.UserName == p.Coordinator)))
+                    {
+                        this.Meetings[p.Topic] = p;
+                        Console.WriteLine("Tenho esta proposal sobre " + p.Topic);
+                    }
+                }
+            }
+
+
+            foreach (KeyValuePair<string, LocationMeetings> entry in meetings)
+            {
+                foreach (Meeting m1 in entry.Value.Meetings)
+                {
+                    AbstractMeeting m = (AbstractMeeting) m1;
+
+                    lock (this.Meetings)
+                    {
+                        this.Meetings[m.Topic] = m;
+                    }
+                }
+            }
+        }
     }
 }

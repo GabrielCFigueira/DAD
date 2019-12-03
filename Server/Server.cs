@@ -500,6 +500,8 @@ namespace Project
                  typeof(ClientInterface),
                  client_URL);
             c.Connect(this.url);
+            Console.WriteLine("TENHO " + this.Proposals.Count + " PROPOSALS");
+            c.InitializeMeetings(this.Proposals,this.Meetings);
             lock (this.Clients)
             {
                 lock (this.ClientsURLS)
@@ -659,10 +661,9 @@ namespace Project
             }
 
             //From this point message will be delivered
-            
+
             //For now it's like this
-            int f = 1;   //Number of fails
-            int x = f + 1;
+            int x = this.maxFaults + 1;
             lock (acks)
             {
                 while (acks[id].Count < x)
@@ -722,8 +723,7 @@ namespace Project
             }
 
             //From this point message will be delivered
-            int f = 1; //Number of fails
-            int x = f + 1;
+            int x = this.maxFaults + 1;
             lock (acks)
             {
                 while (acks[command_id].Count < x)
