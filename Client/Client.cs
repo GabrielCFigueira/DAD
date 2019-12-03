@@ -35,7 +35,7 @@ namespace Project
                 ServerInterface server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
                 server.Connect(clientUrl,userName);
 
-                bool interactive = false;
+                bool interactive = true;
                 StreamReader file = new StreamReader(scriptFileName);
                 string command = file.ReadLine();
                 Console.Write(" h - imprimir esta ajuda\r\n n - executar o próximo comando\r\n l - imprimir próximo comando\r\n r - correr todos os comandos restantes\r\n");

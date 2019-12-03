@@ -495,7 +495,7 @@ namespace Project
 
         public void Connect(string client_URL, string userName)
         {
-            this.UpdateServersClients(client_URL, userName); // rever isto
+            //this.UpdateServersClients(client_URL, userName); // rever isto
             ClientInterface c = (ClientInterface)Activator.GetObject(
                  typeof(ClientInterface),
                  client_URL);
