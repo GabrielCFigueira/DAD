@@ -411,7 +411,7 @@ namespace Project
                 received_commands.Add(command.getCommandId());
             }
             
-            UpdateServers(command, this.Servers);
+            UpdateServers(command, this.url, this.Servers);
             
             if (n_invitees > 0)
             {
@@ -468,13 +468,17 @@ namespace Project
             else
             {
                 Command command = new DoJoin(topic, userName, slots);
+                lock (received_commands)
+                {
+                    received_commands.Add(command.getCommandId());
+                }
                 //this.waitBetweenRequests();
                 lock (this.Servers)
                 {
                     command.Execute(this);
                     this.Servers[this.url]++;
 
-                    UpdateServers(command, this.Servers);
+                    UpdateServers(command, this.url, this.Servers);
                 }
             }
 
@@ -583,7 +587,7 @@ namespace Project
             si.UpdateClose(command, topic, this.url, vectorClock);
         }
 
-        public void UpdateServers(Command command, Dictionary<string, int> clock)
+        public void UpdateServers(Command command, string senderURL, Dictionary<string, int> clock)
         {
             lock (this.Servers)
             {
@@ -596,7 +600,7 @@ namespace Project
                     if (this.url != entry.Key)
                     {
                         string url = entry.Key;
-                        pool[i] = new Thread(() => DoUpdate(url, command, vectorClock));
+                        pool[i] = new Thread(() => DoUpdate(url, senderURL, command, vectorClock));
                         pool[i].Start();
                         i++;
                     }
@@ -604,10 +608,10 @@ namespace Project
             }
         }
 
-        private void DoUpdate(string url, Command command, Dictionary<string, int> vectorClock)
+        private void DoUpdate(string url, string senderURL, Command command, Dictionary<string, int> vectorClock)
         {
             ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-            si.UpdateMeeting(command, this.url, vectorClock);
+            si.UpdateMeeting(command, senderURL, this.url, vectorClock);
         }
 
         public void UpdateServersClients(String clientUrl, String userName)
@@ -639,7 +643,6 @@ namespace Project
 
         public void UpdateClient(string client_url, string userName, string serverURL)
         {
-            //Implement Reliable_Broadcast_Client
             //if command is in acks
             string id = client_url;
             lock (acks)
@@ -684,9 +687,6 @@ namespace Project
                 }
                 Monitor.PulseAll(acks);
             }
-            
-            Console.WriteLine("--Causality--");
-            //Causality
 
             lock (this.Clients)
             {
@@ -699,7 +699,7 @@ namespace Project
             }
         }
 
-        public void UpdateMeeting(Command command, string serverURL, Dictionary<string, int> vectorClock)
+        public void UpdateMeeting(Command command, string originalSender, string serverURL, Dictionary<string, int> vectorClock)
         {
             //Implement Reliable_Broadcast_Servers
             //if command is in acks
@@ -725,7 +725,7 @@ namespace Project
                 if (!received_commands.Contains(command_id))
                 {
                     received_commands.Add(command_id);
-                    UpdateServers(command, vectorClock); //FIXME mandar o clock da mensagem
+                    UpdateServers(command, originalSender, vectorClock);
                 }
                 else
                 {
@@ -747,13 +747,13 @@ namespace Project
             }
             lock (this.Servers)
             {
-                printClocks(serverURL, vectorClock, this.Servers);
-                while (!checkClock(serverURL, vectorClock))
+                printClocks(originalSender, vectorClock, this.Servers);
+                while (!checkClock(originalSender, vectorClock))
                 {
                     Monitor.Wait(this.Servers);
                 }
 
-                this.Servers[serverURL]++;
+                this.Servers[originalSender]++;
 
                 command.Execute(this);
                 Monitor.PulseAll(this.Servers);
@@ -1144,11 +1144,11 @@ namespace Project
 
 
             //Before updateServers (reliable broadcast)
-            string command_id = command.getCommandId();
+           /* string command_id = command.getCommandId();
             lock (received_commands) //Adding my message to my received_commands
             {
                 received_commands.Add(command_id);
-            }
+            }*/
             AbstractMeeting am = command.Execute(this);
             this.Servers[this.url]++;
             lastTicket++;
