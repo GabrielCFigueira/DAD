@@ -47,7 +47,7 @@ namespace Project
         Dictionary<string, Ticket> Tickets;
 
         string id;
-        String url;
+        string url;
         int maxFaults;
         int minDelay;
         int maxDelay;
@@ -121,7 +121,7 @@ namespace Project
                 lock (server.Proposals)
                 {
                     AbstractMeeting am = null;
-                    if (!server.Proposals.ContainsKey(this.Topic))
+                    if (!server.Proposals.ContainsKey(this.Topic)) //FIXME join antes do create
                     {
                         Console.WriteLine("O cliente " + userName + " fez join atrasado a uma Meeting ja fechada");
                         foreach (LocationMeetings lm in server.Meetings.Values)
@@ -273,7 +273,7 @@ namespace Project
 
                                 while (attendees.Count > selectedRoom.Capacity)
                                 {
-                                    attendees.RemoveAt(attendees.Count - 1);
+                                    attendees.RemoveAt(attendees.Count - 1); //FIXME decide who to remove
                                 }
 
                                 Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, attendees);
@@ -285,7 +285,7 @@ namespace Project
                         }
                         else
                         {
-                            throw new Exception(); //coordinator must be the one closing
+                            throw new Exception(); //coordinator must be the one closing FIXME
                         }
 
                     }
@@ -504,7 +504,7 @@ namespace Project
                 Thread[] pool = new Thread[this.Servers.Count - 1];
                 int i = 0;
                 Dictionary<string, int> vectorClock = new Dictionary<string, int>(this.Servers);
-                this.waitBetweenRequests();
+                this.waitBetweenRequests(); //FIXME
                 foreach (KeyValuePair<String, int> entry in this.Servers)
                 {
                     if (this.url != entry.Key)
@@ -754,6 +754,7 @@ namespace Project
                     if(this.Tickets.ContainsKey(topic))
                     {
                         return 0; //default value for already existing tickets FIXME fault tolerance
+                        //FIXME in case of failure, check with everyone
                     }
                     ticket++;
                     this.Tickets.Add(topic, new Ticket(ticket, serverURL, this.Closes[topic]));
