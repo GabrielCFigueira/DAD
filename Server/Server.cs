@@ -13,19 +13,20 @@ namespace Project
     {
         static void Main(string[] args)
         {
-            int id = Int32.Parse(args[1]);
+            string id = args[1];
             String url = args[2];
             int maxFaults = Int32.Parse(args[3]);
             int minDelay = Int32.Parse(args[4]);
             int maxDelay = Int32.Parse(args[5]);
 
             String puppetURL = args[6]; // O server precisa de ter o url do puppet (Martelado)
+            String masterServer = args[7]; // (Martelado)
 
             Uri uri = new Uri(url);
             TcpChannel channel = new TcpChannel(uri.Port);
             ChannelServices.RegisterChannel(channel, false);
 
-            ServerImpl MeetingServer = new ServerImpl(id,url,maxFaults,minDelay,maxDelay, puppetURL);
+            ServerImpl MeetingServer = new ServerImpl(id,url,maxFaults,minDelay,maxDelay, puppetURL, masterServer);
             RemotingServices.Marshal(MeetingServer, uri.Segments[1], typeof(ServerImpl));
 
             MeetingServer.InitializeLocationsAndRooms();
@@ -34,67 +35,213 @@ namespace Project
         }
     }
 
+
     class ServerImpl : MarshalByRefObject, ServerInterface, IServerPuppet
     {
+
         Dictionary<String, ClientInterface> Clients;
         Dictionary<String, Proposal> Proposals;
         Dictionary<String, LocationMeetings> Meetings;
-        List<string> Servers;
-        
-        int id;
+        Dictionary<String, int> Servers;
+
+        string id;
         String url;
         int maxFaults;
         int minDelay;
         int maxDelay;
 
         String puppetURL;
+        String masterServer;
+        String lockTicket = "";
+        Int32 ticket = 0;
+        Int32 lastTicket = 0;
 
-        public ServerImpl(int id, String url, int maxFaults, int minDelay, int maxDelay, String puppetURL)
+        //Reliable_BroadCast structures
+        Dictionary<string, List<string>> acks; //Key: depends on command, values: list of servers
+        List<string> received_commands;
+
+        //Freeze and Unfreeze variable
+        bool freeze = false;
+
+        [Serializable]
+        private class DoCreate : Command
         {
-            this.id = id;
-            this.url = url;
-            this.maxFaults = maxFaults;
-            this.minDelay = minDelay;
-            this.maxDelay = maxDelay;
-            this.Proposals = new Dictionary<String, Proposal>();
-            this.Clients = new Dictionary<String, ClientInterface>();
-            this.Meetings = new Dictionary<string, LocationMeetings>();
-            this.Servers = new List<string>();
+            string command_id;
+            string coordinator;
+            string topic;
+            int min_attendees;
+            int n_slots;
+            int n_invitees;
+            List<String> slots;
+            List<String> invitees;
 
-            this.puppetURL = puppetURL;
-        }
-
-        public override object InitializeLifetimeService()
-        {
-            return null;
-        }
-
-        public void CloseMeeting(String userName, String topic)
-        {
-            lock (this.Proposals)
+            public DoCreate(string coordinator, string topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
             {
-                lock (this.Meetings)
+                this.coordinator = coordinator;
+                this.topic = topic;
+                this.min_attendees = min_attendees;
+                this.n_slots = n_slots;
+                this.n_invitees = n_invitees;
+                this.slots = slots;
+                this.invitees = invitees;
+                this.command_id = topic + "Create";  //id Create
+            }
+
+            override public AbstractMeeting Execute(ServerInterface si)
+            {
+                ServerImpl server = (ServerImpl)si;
+                lock (server.Proposals)
                 {
-                    Proposal p = this.Proposals[topic];
-                    Slot chosenSlot = null;
-                    Room selectedRoom = null;
-                    double efficiency = 0;
-                    int absVotesRoomCapacity = int.MaxValue;
-                    if (p.Coordinator == userName)
+                    lock (server.Clients)
                     {
-                        foreach (Slot s in p.Slots.Values)
+                        Dictionary<String, Slot> Slots = new Dictionary<String, Slot>();
+                        foreach (String s in slots)
                         {
-                            List<Meeting> meetings = this.Meetings[s.Location.Local].Meetings;
-                            if (meetings.Count != 0)
+                            string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
+
+                            Location l = server.Meetings[zone_date[0]].Location;
+                            Slot slot = new Slot(l, zone_date[1]);
+                            Slots.Add(s, slot);
+                        }
+                        Proposal p = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, Slots, invitees);
+                        server.Proposals.Add(p.Topic, p);
+
+                        return p;
+                    }
+                }
+            }
+
+            override public string getCommandId()
+            {
+                return this.command_id;
+            }
+        }
+
+        [Serializable]
+        private class DoJoin : Command
+        {
+            string command_id;
+            string topic;
+            string userName;
+            List<string> slots;
+            public DoJoin(string topic, string userName, List<string> slots)
+            {
+                this.topic = topic;
+                this.userName = userName;
+                this.slots = slots;
+                this.command_id = topic +  userName;
+            }
+
+            override public AbstractMeeting Execute(ServerInterface si)
+            {
+                ServerImpl server = (ServerImpl)si;
+                lock (server.Proposals)
+                {
+                    Proposal p = null;
+
+                    if (!server.Proposals.TryGetValue(topic, out p))
+                    {
+                        Console.WriteLine("O cliente " + userName + " fez join a uma Meeting nao existente");
+                        return p;
+                    }
+
+                    List<Slot> Slots = new List<Slot>();
+                    if ((p.N_invitees != 0 && p.Invitees.Contains(userName)) || p.N_invitees == 0 || p.Coordinator == userName)
+                    {
+                        foreach (String s in slots)
+                        {
+                            string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
+
+                            Location l = server.Meetings[zone_date[0]].Location;
+                            Slot slot = new Slot(l, zone_date[1]);
+                            p.Slots[s].Votes += 1;
+                            slot.Votes = p.Slots[s].Votes;
+                            Slots.Add(slot);
+                        }
+
+                        Attendee a = new Attendee(userName, Slots);
+                        p.Version += 1;
+                        p.Attendees.Add(a);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Sou o/a " + userName + " e estou a dar join a um meeting onde nao estou convidado/a");
+                    }
+
+                    return p;
+
+                }
+            }
+
+            override public string getCommandId()
+            {
+                return this.command_id;
+            }
+        }
+
+        [Serializable]
+        private class DoClose : Command
+        {
+            string command_id;
+            string topic;
+            string userName;
+
+            public DoClose(String userName, String topic)
+            {
+                this.topic = topic;
+                this.userName = userName;
+                this.command_id = topic;
+            }
+
+            override public AbstractMeeting Execute(ServerInterface si)
+            {
+                ServerImpl server = (ServerImpl)si;
+                lock (server.Proposals)
+                {
+                    lock (server.Meetings)
+                    {
+                        Proposal p = server.Proposals[topic];
+                        Slot chosenSlot = null;
+                        Room selectedRoom = null;
+                        double efficiency = 0;
+                        if (p.Coordinator == userName)
+                        {
+                            foreach (Slot s in p.Slots.Values)
                             {
-                                foreach (Meeting m in meetings)
+                                List<Meeting> meetings = server.Meetings[s.Location.Local].Meetings;
+                                if (meetings.Count != 0)
+                                {
+                                    foreach (Meeting m in meetings)
+                                    {
+                                        foreach (Room r in s.Location.Rooms)
+                                        {
+                                            if ((m.SelectedRoom.Name != r.Name || m.Slot.Date != s.Date) && Math.Min(s.Votes, r.Capacity) >= p.Min_attendees)
+                                            {
+                                                double tempEfficiency = (double)s.Votes / r.Capacity;
+                                                if (chosenSlot == null
+                                                || Math.Min(chosenSlot.Votes, selectedRoom.Capacity) < Math.Min(s.Votes, r.Capacity)
+                                                || (Math.Min(chosenSlot.Votes, selectedRoom.Capacity) == Math.Min(s.Votes, r.Capacity)
+                                                && tempEfficiency > efficiency))
+                                                {
+                                                    chosenSlot = s;
+                                                    selectedRoom = r;
+                                                    efficiency = tempEfficiency;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                else
                                 {
                                     foreach (Room r in s.Location.Rooms)
                                     {
-                                        if ((m.SelectedRoom != r || m.Slot.Date != s.Date) && s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
+                                        if (Math.Min(s.Votes, r.Capacity) >= p.Min_attendees)
                                         {
                                             double tempEfficiency = (double)s.Votes / r.Capacity;
-                                            if ((chosenSlot == null || (chosenSlot != null && chosenSlot.Votes <= s.Votes)) && tempEfficiency > efficiency)
+                                            if (chosenSlot == null
+                                                || Math.Min(chosenSlot.Votes, selectedRoom.Capacity) < Math.Min(s.Votes, r.Capacity)
+                                                || (Math.Min(chosenSlot.Votes, selectedRoom.Capacity) == Math.Min(s.Votes, r.Capacity)
+                                                && tempEfficiency > efficiency))
                                             {
                                                 chosenSlot = s;
                                                 selectedRoom = r;
@@ -104,133 +251,229 @@ namespace Project
                                     }
                                 }
                             }
+                            if (chosenSlot == null)
+                            {
+                                p.IsCancelled = true;
+                                p.Version += 1;
+                                lock(server.lockTicket)
+                                {
+                                    server.lastTicket++;
+                                }
+                                return p;
+                            }
                             else
                             {
-                                foreach (Room r in s.Location.Rooms)
+                                while (p.Attendees.Count > selectedRoom.Capacity)
                                 {
-                                    if (s.Votes <= r.Capacity && s.Votes >= p.Min_attendees)
-                                    {
-                                        double tempEfficiency = (double)s.Votes / r.Capacity;
-                                        if ((chosenSlot == null || (chosenSlot != null && chosenSlot.Votes <= s.Votes)) && tempEfficiency > efficiency)
-                                        {
-                                            chosenSlot = s;
-                                            selectedRoom = r;
-                                            efficiency = tempEfficiency;
-                                        }
-                                    }
+                                    p.Attendees.RemoveAt(p.Attendees.Count - 1);
                                 }
-                            }
-                        }
-                        if (chosenSlot == null)
-                        {
-                            foreach(Slot s in p.Slots.Values)
-                            {
-                                foreach (Room r in s.Location.Rooms)
+
+                                Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, p.Attendees);
+                                server.Meetings[chosenSlot.Location.Local].addMeeting(meeting);
+                                server.Proposals.Remove(p.Topic);
+
+                                lock (server.lockTicket)
                                 {
-                                    int tempABS = Math.Abs(s.Votes - r.Capacity);
-                                    if (s.Votes >= p.Min_attendees &&  s.Votes >= r.Capacity && tempABS < absVotesRoomCapacity)
-                                    {
-                                        absVotesRoomCapacity = tempABS;
-                                        chosenSlot = s;
-                                        selectedRoom = r;
-                                    }
+                                    server.lastTicket++;
                                 }
-                            }
-                            while(p.Attendees.Count > selectedRoom.Capacity)
-                            {
-                                p.Attendees.RemoveAt(p.Attendees.Count - 1);
+
+                                return meeting;
                             }
                         }
-                        if(chosenSlot == null && selectedRoom == null && absVotesRoomCapacity == int.MaxValue)
+                        else
                         {
-                            p.IsCancelled = true;
-                            p.Version += 1;
-                            UpdateServers(p);
-                            return;
+                            lock (server.lockTicket)
+                            {
+                                server.lastTicket++;
+                            }
+                            throw new Exception(); //coordinator must be the one closing
                         }
-                        Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, p.Attendees);
-                        this.Meetings[chosenSlot.Location.Local].addMeeting(meeting);
-                        this.Proposals.Remove(p.Topic);
-                        UpdateServers(meeting);
+
                     }
                 }
             }
+
+            override public string getCommandId()
+            {
+                return this.command_id;
+            }
+        }
+
+        public ServerImpl(string id, String url, int maxFaults, int minDelay, int maxDelay, String puppetURL, string masterServer)
+        {
+            this.id = id;
+            this.url = url;
+            this.maxFaults = maxFaults;
+            this.minDelay = minDelay;
+            this.maxDelay = maxDelay;
+            this.Proposals = new Dictionary<String, Proposal>();
+            this.Clients = new Dictionary<String, ClientInterface>();
+            this.Meetings = new Dictionary<string, LocationMeetings>();
+            this.Servers = new Dictionary<string, int>();
+            this.Servers.Add(url, 0);
+
+            this.puppetURL = puppetURL;
+            this.masterServer = masterServer;
+
+            //Reliable_Broadcast
+            this.acks = new Dictionary<string, List<string>>();
+            this.received_commands = new List<string>();
+;
+        }
+
+        public override object InitializeLifetimeService()
+        {
+            return null;
+        }
+
+        public void waitBetweenRequests()
+        {
+            Random timeout = new Random();
+            int timeSleeping = timeout.Next(this.minDelay, this.maxDelay);
+            Thread.Sleep(timeSleeping);
+        }
+
+        public void CloseMeeting(String userName, String topic)
+        {
+            this.waitBetweenRequests();
+
+            lock (this)
+            {
+                while (freeze)
+                {
+                    Monitor.Wait(this);
+                }
+                Monitor.PulseAll(this);
+            }
+
+            int newTicket;
+            if(masterServer == "1")
+            {
+                newTicket = GetTicket();
+            }
+            else
+            {
+                ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), masterServer);
+                newTicket = si.GetTicket();
+            }
+
+            lock (lockTicket)
+            {
+                while (newTicket - 1 != lastTicket)
+                {
+                    Monitor.Wait(lockTicket);
+                }
+            }
+            Command command = new DoClose(userName, topic);
+            command.Execute(this);
+            lock (this.Servers)
+            {
+                this.Servers[this.url]++;
+            }
+            //Before updateServers (reliable broadcast)
+            string command_id = command.getCommandId();
+            lock (received_commands) //Adding my message to my received_commands
+            {
+                received_commands.Add(command_id);
+            }
+            
+            UpdateServers(command);
         }
 
         public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
         {
-            lock (this.Proposals)
-            {
-                lock (this.Clients)
-                {
-                    Dictionary<String, Slot> Slots = new Dictionary<String, Slot>();
-                    foreach (String s in slots)
-                    {
-                        string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
+            this.waitBetweenRequests();
 
-                        Location l = Meetings[zone_date[0]].Location;
-                        Slot slot = new Slot(l, zone_date[1]);
-                        Slots.Add(s, slot);
-                    }
-                    Proposal p = new Proposal(coordinator, topic, min_attendees, n_slots, n_invitees, Slots, invitees);
-                    Proposals.Add(p.Topic, p);
-                    UpdateServers(p);
-                    if (n_invitees > 0)
-                    {
-                        foreach (String s in invitees)
-                        {
-                            ClientInterface c = this.Clients[s];
-                            c.AddProposal(p);
-                        }
-                        this.Clients[coordinator].AddProposal(p);
-                    }
-                    else if (n_invitees == 0)
-                    {
-                        foreach (KeyValuePair<String, ClientInterface> entry in Clients)
-                        {
-                            ClientInterface c = entry.Value;
-                            c.AddProposal(p);
-                        }
-                    }
+            lock (this)
+            {
+                while (freeze)
+                {
+                    Monitor.Wait(this);
+                }
+                Monitor.PulseAll(this);
+            }
+
+
+            Command command = new DoCreate(coordinator, topic, min_attendees, n_slots, n_invitees, slots, invitees);
+            Proposal p = (Proposal) command.Execute(this);
+            lock (this.Servers)
+            {
+                this.Servers[this.url]++;
+            }
+            
+            lock (received_commands)
+            {
+                received_commands.Add(command.getCommandId());
+            }
+            
+            UpdateServers(command);
+            
+            if (n_invitees > 0)
+            {
+                foreach (String s in invitees)
+                {
+                    ClientInterface c = this.Clients[s];
+                    c.AddProposal(p);
+                }
+                try
+                { //in case the coordinator invites himself
+                    this.Clients[coordinator].AddProposal(p);
+                } catch (ArgumentException e)
+                {
+                    Console.WriteLine("O utilizador " + coordinator + " convidou-se a si mesmo");
+                }
+            }
+            else if (n_invitees == 0)
+            {
+                foreach (KeyValuePair<String, ClientInterface> entry in Clients)
+                {
+                    ClientInterface c = entry.Value;
+                    c.AddProposal(p);
                 }
             }
         }
 
         public void JoinMeeting(String topic, String userName, List<String> slots)
         {
-            lock (this.Proposals)
+            this.waitBetweenRequests();
+
+            lock (this)
             {
-                Proposal p = this.Proposals[topic];
-                List<Slot> Slots = new List<Slot>();
-                if ((p.N_invitees != 0 && p.Invitees.Contains(userName)) || p.N_invitees == 0 || p.Coordinator == userName)
+                while (freeze)
                 {
-                    foreach (String s in slots)
-                    {
-                        string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
-
-                        Location l = Meetings[zone_date[0]].Location;
-                        Slot slot = new Slot(l, zone_date[1]);
-                        p.Slots[s].Votes += 1;
-                        slot.Votes = p.Slots[s].Votes;
-                        Slots.Add(slot);
-
-                    }
-
-                    Attendee a = new Attendee(userName, Slots);
-                    p.Version += 1;
-                    p.Attendees.Add(a);
-                    UpdateServers(p);
+                    Monitor.Wait(this);
                 }
-                else
-                {
-                    Console.WriteLine("Sou o/a " + userName + " e estou a dar join a um meeting onde nao estou convidado/a");
-                }
+                Monitor.PulseAll(this);
             }
+
+            Command command = new DoJoin(topic, userName, slots);
+            command.Execute(this);
+            lock (this.Servers)
+            {
+                this.Servers[this.url]++;
+            }
+            //Before updateServers (reliable broadcast)
+            lock (received_commands)
+            {
+                received_commands.Add(command.getCommandId());
+            }
+            UpdateServers(command);
 
         }
 
         public void ListMeetings(String userName)
         {
+            this.waitBetweenRequests();
+
+            lock (this)
+            {
+                while (freeze)
+                {
+                    Monitor.Wait(this);
+                }
+                Monitor.PulseAll(this);
+            }
+
             lock (this.Proposals)
             {
                 lock (this.Meetings)
@@ -251,8 +494,14 @@ namespace Project
             {
                 Clients.Add(userName, c);
             }
+
+            lock (received_commands)
+            {
+                received_commands.Add(client_URL);
+            }
+
             this.UpdateServersClients(client_URL, userName);
-            Console.WriteLine("Registei o cliente");
+            Console.WriteLine("Registei o/a cliente " + userName);
 
         }
 
@@ -292,24 +541,29 @@ namespace Project
             file.Close();
         }
 
-        public void UpdateServers(AbstractMeeting absMeeting)
+        public void UpdateServers(Command command)
         {
             lock (this.Servers)
             {
-                Thread[] pool = new Thread[this.Servers.Count];
-                for (int i = 0; i < this.Servers.Count; i++)
+                Thread[] pool = new Thread[this.Servers.Count - 1];
+                int i = 0;
+                foreach(KeyValuePair<String, int> entry in this.Servers)
                 {
-                    string url = this.Servers[i];
-                    pool[i] = new Thread(() => DoUpdate(url, absMeeting));
-                    pool[i].Start();
+                    if (this.url != entry.Key)
+                    {
+                        string url = entry.Key;
+                        pool[i] = new Thread(() => DoUpdate(url, command));
+                        pool[i].Start();
+                        i++;
+                    }
                 }
             }
         }
 
-        private void DoUpdate(string url, AbstractMeeting absMeeting)
+        private void DoUpdate(string url, Command command)
         {
             ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-            si.UpdateMeeting(absMeeting);
+            si.UpdateMeeting(command, this.url, this.Servers);
         }
 
         public void UpdateServersClients(String clientUrl, String userName)
@@ -317,26 +571,79 @@ namespace Project
             lock (this.Servers)
             {
 
-                Thread[] pool = new Thread[this.Servers.Count];
-                for (int i = 0; i < this.Servers.Count; i++)
+                Thread[] pool = new Thread[this.Servers.Count - 1];
+                int i = 0;
+                foreach (KeyValuePair<String, int> entry in this.Servers)
                 {
-                    string url = this.Servers[i];
-                    pool[i] = new Thread(() => DoUpdateClient(url, clientUrl, userName));
-                    pool[i].Start();
+                    if(entry.Key != this.url)
+                    {
+                        string url = entry.Key;
+                        pool[i] = new Thread(() => DoUpdateClient(url, clientUrl, userName));
+                        pool[i].Start();
+                        i++;
+                    }
                 }
-
             }
         }
 
         private void DoUpdateClient(string serverUrl, string clientUrl, string userName)
         {
             ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
-            Console.WriteLine("Sou o servidor e vou fazer update aos meus clientes");
-            si.UpdateClient(clientUrl, userName);
+            Console.WriteLine("Sou o servidor e vou fazer update com o user " + userName);
+            si.UpdateClient(clientUrl, userName, this.url);
         }
 
-        public void UpdateClient(String client_url,string userName)
+        public void UpdateClient(string client_url, string userName, string serverURL)
         {
+            //Implement Reliable_Broadcast_Client
+            //if command is in acks
+            string id = client_url;
+            lock (acks)
+            {
+                if (acks.ContainsKey(id))
+                {
+                    //adds server to the acks of the message
+                    acks[id].Add(serverURL);
+                }
+                else
+                {
+                    acks.Add(id, new List<string>());
+                    acks[id].Add(serverURL);
+                }
+                Monitor.PulseAll(acks);  //Wake every spleeping thread that are waiting for acks
+            }
+
+            lock (received_commands)
+            {
+                //If not command received broadcast to everyone
+                if (!received_commands.Contains(id))
+                {
+                    received_commands.Add(id);
+                    UpdateServersClients(client_url, userName);
+                }
+                else
+                {
+                    return;
+                }
+            }
+
+            //From this point message will be delivered
+            
+            //For now it's like this
+            int f = 1;   //Number of fails
+            int x = f + 1;
+            lock (acks)
+            {
+                while (acks[id].Count < x)
+                {
+                    Monitor.Wait(acks);
+                }
+                Monitor.PulseAll(acks);
+            }
+            
+            Console.WriteLine("--Causality--");
+            //Causality
+
             lock (this.Clients)
             {
                 ClientInterface ci = (ClientInterface)Activator.GetObject(typeof(ClientInterface), client_url);
@@ -348,32 +655,105 @@ namespace Project
             }
         }
 
-        public void UpdateMeeting(AbstractMeeting absMeeting)
+        public void UpdateMeeting(Command command, string serverURL, Dictionary<string, int> vectorClock)
         {
-            lock (this.Proposals)
+            //Implement Reliable_Broadcast_Servers
+            //if command is in acks
+            string command_id = command.getCommandId();
+            lock (acks)
             {
-                lock (this.Meetings)
+                if (acks.ContainsKey(command_id))
                 {
-                    if (absMeeting.isProposal())
-                    {
-                        this.Proposals[absMeeting.Topic] = (Proposal)absMeeting;
-                    }
-                    else
-                    {
-                        Meeting m = (Meeting)absMeeting;
-                        this.Proposals.Remove(absMeeting.Topic);
-                        this.Meetings[m.Slot.Location.Local].addMeeting(m);
-                    }
+                    //adds server to the acks of the message
+                    acks[command_id].Add(serverURL);
+                }
+                else
+                {
+                    acks.Add(command_id, new List<string>());
+                    acks[command_id].Add(serverURL);
+                }
+                Monitor.PulseAll(acks);  //Wake every spleeping thread that are waiting for acks
+            }
+
+            lock (received_commands)
+            {
+                //If not command received broadcast to everyone
+                if (!received_commands.Contains(command_id))
+                {
+                    received_commands.Add(command_id);
+                    UpdateServers(command);
+                }
+                else
+                {
+                    return;
                 }
             }
+
+            //From this point message will be delivered
+            int f = 1; //Number of fails
+            int x = f + 1;
+            lock (acks)
+            {
+                while (acks[command_id].Count < x)
+                {
+                    Monitor.Wait(acks);
+                }
+
+                Monitor.PulseAll(acks);
+            }
+
+            Console.WriteLine("Causality");
+            //Causality
+
+            //lock(this.Servers)
+            //{
+            //    Console.WriteLine("Server's own clock");
+            //    printClock(this.Servers);
+            //    Console.WriteLine("Received Clock");
+            //    printClock(vectorClock);
+            //    while(!checkClock(serverURL, vectorClock))
+            //    {
+            //        Monitor.Wait(this.Servers);
+            //    }
+
+            //    this.Servers[serverURL]++;
+
+            //    Monitor.Pulse(this.Servers);
+            //}
+
+            command.Execute(this);
+        }
+
+        private bool checkClock(string serverURL, Dictionary<string, int> vectorClock)
+        {
             
+            foreach (KeyValuePair<string, int> entry in this.Servers)
+            {
+                if (serverURL != entry.Key && entry.Value < vectorClock[entry.Key])
+                {
+                    return false;
+                }
+                else if (serverURL == entry.Key && entry.Value != vectorClock[entry.Key] - 1)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private void printClock(Dictionary<string, int> vectorClock)
+        {
+            foreach (KeyValuePair<string, int> entry in vectorClock)
+            {
+                Console.WriteLine("Server: " + entry.Key + " Clock: " + entry.Value);
+            }
         }
 
         public void AddServer(String serverURL)
         {
             lock (this.Servers)
             {
-                this.Servers.Add(serverURL);
+                this.Servers.Add(serverURL, 0);
             }
         }
 
@@ -393,6 +773,16 @@ namespace Project
         {
             Console.WriteLine("\n-----STATUS-----\n");
             Console.WriteLine("I'm ALIVE!");
+
+            lock (this)
+            {
+
+                if (freeze)
+                {
+                    Console.WriteLine("But I'm Freezed");
+                }
+            }
+
             Console.WriteLine("Server id: " + id + " Server url: " + url);
             //Console.WriteLine("Maximum Faults: " + maxFaults);
             //Console.WriteLine("Maximum Delay: " +  maxDelay);
@@ -401,9 +791,9 @@ namespace Project
             Console.WriteLine("Servers that are alive: ");
             if (Servers.Count != 0) 
             {
-                foreach (string s in Servers)
+                foreach (KeyValuePair<String, int> entry in this.Servers)
                 {
-                    Console.WriteLine("Server: " + s);
+                    Console.WriteLine("Server: " + entry.Key);
                 }
             } else { Console.WriteLine("No Servers Available"); }
 
@@ -448,14 +838,22 @@ namespace Project
             shutdown();
         }
 
-        public void Freeze(string server_id)
+        public void Freeze()
         {
-            throw new NotImplementedException();
+            lock (this)
+            {
+                freeze = true;
+                Monitor.PulseAll(this);
+            }
         }
 
-        public void Unfreeze(string server_id)
+        public void Unfreeze()
         {
-            throw new NotImplementedException();
+            lock (this)
+            {
+                freeze = false;
+                Monitor.PulseAll(this);
+            }
         }
 
         public void shutdown()
@@ -470,6 +868,14 @@ namespace Project
             Environment.Exit(0);
         }
 
+
+        public int GetTicket()
+        {
+            lock (lockTicket)
+            {
+                return ++ticket;
+            }
+        }
 
     }
 

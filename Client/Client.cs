@@ -35,12 +35,42 @@ namespace Project
                 ServerInterface server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
                 server.Connect(clientUrl,userName);
 
-                string command = "";
+                bool interactive = false;
                 StreamReader file = new StreamReader(scriptFileName);
-                while ((command = file.ReadLine()) != null)
+                string command = file.ReadLine();
+                Console.Write(" h - imprimir esta ajuda\r\n n - executar o próximo comando\r\n l - imprimir próximo comando\r\n r - correr todos os comandos restantes\r\n");
+
+
+                while (command != null)
                 {
-                    MeetingClient.ReadCommands(command);
+                    if (interactive)
+                    {
+                        Console.Write("> ");
+                        switch (Console.ReadLine())
+                        {
+                            case "n":
+                                Console.WriteLine(command);
+                                MeetingClient.ReadCommands(command);
+                                command = file.ReadLine();
+                                break;
+                            case "l":
+                                Console.WriteLine(command);
+                                break;
+                            case "r":
+                                interactive = false;
+                                break;
+                            case "h":
+                                Console.Write(" h - imprimir esta ajuda\r\n n - executar o próximo comando\r\n l - imprimir próximo comando\r\n r - correr todos os comandos restantes\r\n");
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        MeetingClient.ReadCommands(command);
+                        command = file.ReadLine();
+                    }
                 }
+
                 file.Close();
 
 
@@ -127,7 +157,7 @@ namespace Project
                     Thread.Sleep(interval);
                     break;
                 default:
-                    Console.WriteLine("What are you doing noob\r\n");
+                    Console.WriteLine("Wrong Command");
                     break;
             }
         }

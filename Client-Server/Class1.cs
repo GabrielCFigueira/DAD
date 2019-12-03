@@ -37,9 +37,19 @@ namespace Project
 
         void Connect(String URL,String userName);
 
-        void UpdateMeeting(AbstractMeeting absMeeting);
+        void UpdateMeeting(Command command, string serverURL, Dictionary<string, int> vectorClock);
 
-        void UpdateClient(String client_url,String userName);
+        void UpdateClient(String client_url,String userName, string serverURL);
+
+        int GetTicket();
+    }
+
+    [Serializable]
+    public abstract class Command
+    {
+        string command_id;
+        public abstract AbstractMeeting Execute(ServerInterface si);
+        public abstract string getCommandId();
     }
 
     [Serializable]

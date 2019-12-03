@@ -36,10 +36,10 @@ namespace PCS
             return null;
         }
 
-        public void createServer(string serverID, string url, string maxFaults, string minDelay, string maxDelay, string puppetURL)
+        public void createServer(string serverID, string url, string maxFaults, string minDelay, string maxDelay, string puppetURL, string masterServer)
         {
             ProcessStartInfo server = new ProcessStartInfo(@"..\..\..\Server\bin\Debug\Server.exe");
-            server.Arguments = "Server " + serverID + " " + url + " " + maxFaults + " " + minDelay + " " + maxDelay + " " + puppetURL;
+            server.Arguments = "Server " + serverID + " " + url + " " + maxFaults + " " + minDelay + " " + maxDelay + " " + puppetURL + " " + masterServer;
             Process.Start(server);
         }
 
