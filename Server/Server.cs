@@ -370,7 +370,8 @@ namespace Project
                 }
                 Monitor.PulseAll(this);
             }
-
+            lock(this.Servers)
+            { 
                 lock (this.Tickets)
                 {
                     lock (this.Closes)
@@ -410,7 +411,7 @@ namespace Project
                 received_commands.Add(command.getCommandId());
             }
             
-            UpdateServers(command);
+            UpdateServers(command, this.Servers);
             
             if (n_invitees > 0)
             {
@@ -450,34 +451,32 @@ namespace Project
                 Monitor.PulseAll(this);
             }
 
-        if (!this.Proposals.ContainsKey(topic)) //FIXME pending create?
-        {
-            lock (this.Servers)
+            if (!this.Proposals.ContainsKey(topic)) //FIXME pending create?
             {
-                lock (this.Tickets)
+                lock (this.Servers)
                 {
-                    lock (this.Closes)
+                    lock (this.Tickets)
                     {
-                        Command command = new DoJoin(topic, userName, slots);
-                        ExecuteTicket(command, userName);
+                        lock (this.Closes)
+                        {
+                            Command command = new DoJoin(topic, userName, slots);
+                            ExecuteTicket(command, userName);
+                        }
                     }
                 }
             }
-        }
-        else
-        {
-            Command command = new DoJoin(topic, userName, slots);
-            //this.waitBetweenRequests();
-            lock (this.Servers)
+            else
             {
-                command.Execute(this);
-                this.Servers[this.url]++;
+                Command command = new DoJoin(topic, userName, slots);
+                //this.waitBetweenRequests();
+                lock (this.Servers)
+                {
+                    command.Execute(this);
+                    this.Servers[this.url]++;
 
-                UpdateServers(command);
+                    UpdateServers(command, this.Servers);
+                }
             }
-        }
-
-
 
         }
 
@@ -584,13 +583,13 @@ namespace Project
             si.UpdateClose(command, topic, this.url, vectorClock);
         }
 
-        public void UpdateServers(Command command)
+        public void UpdateServers(Command command, Dictionary<string, int> clock)
         {
             lock (this.Servers)
             {
                 Thread[] pool = new Thread[this.Servers.Count - 1];
                 int i = 0;
-                Dictionary<string, int> vectorClock = new Dictionary<string, int>(this.Servers);
+                Dictionary<string, int> vectorClock = new Dictionary<string, int>(clock);
                 this.waitBetweenRequests(); //FIXME
                 foreach (KeyValuePair<String, int> entry in this.Servers)
                 {
@@ -726,7 +725,7 @@ namespace Project
                 if (!received_commands.Contains(command_id))
                 {
                     received_commands.Add(command_id);
-                    UpdateServers(command); //FIXME mandar o clock da mensagem
+                    UpdateServers(command, vectorClock); //FIXME mandar o clock da mensagem
                 }
                 else
                 {
@@ -746,27 +745,20 @@ namespace Project
 
                 Monitor.PulseAll(acks);
             }
+            lock (this.Servers)
+            {
+                printClocks(serverURL, vectorClock, this.Servers);
+                while (!checkClock(serverURL, vectorClock))
+                {
+                    Monitor.Wait(this.Servers);
+                }
 
-            Console.WriteLine("Causality");
-            //Causality
+                this.Servers[serverURL]++;
 
-            //lock(this.Servers)
-            //{
-            //    Console.WriteLine("Server's own clock");
-            //    printClock(this.Servers);
-            //    Console.WriteLine("Received Clock");
-            //    printClock(vectorClock);
-            //    while(!checkClock(serverURL, vectorClock))
-            //    {
-            //        Monitor.Wait(this.Servers);
-            //    }
-
-            //    this.Servers[serverURL]++;
-
-            //    Monitor.Pulse(this.Servers);
-            //}
-
-            command.Execute(this);
+                command.Execute(this);
+                Monitor.PulseAll(this.Servers);
+            }
+        }
         public void UpdateClose(Command command, string topic, string serverURL, Dictionary<string, int> vectorClock)
         {
             //FIXME add RB
@@ -786,7 +778,7 @@ namespace Project
                 }
                 Monitor.PulseAll(this.Servers);
             }
-        command.Execute(this);
+            
         }
 
         private bool checkClock(string serverURL, Dictionary<string, int> vectorClock)

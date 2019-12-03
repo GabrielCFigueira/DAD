@@ -63,7 +63,6 @@ namespace Project
         {
             get { return topic;  }
         }
-        string command_id;
         public abstract AbstractMeeting Execute(ServerInterface si);
         public abstract string getCommandId();
     }
