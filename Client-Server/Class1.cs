@@ -29,6 +29,8 @@ namespace Project
 
         void InitializeMeetings(Dictionary<string, Proposal> proposals, Dictionary<string, LocationMeetings> meetings);
 
+        void getServers(Dictionary<String, int> Servers);
+
     }
 
     public interface ServerInterface
@@ -48,8 +50,9 @@ namespace Project
         void UpdateClient(String client_url,String userName, string serverURL);
 
         int GetTicket();
-
         (String,String) getRandomClientName();
+
+        void RemoveAvailableServer(String server_url);
     }
 
     [Serializable]

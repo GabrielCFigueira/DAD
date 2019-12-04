@@ -1,8 +1,10 @@
 ﻿using Puppet_Server;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Sockets;
 using System.Runtime.Remoting;
 using System.Runtime.Remoting.Channels;
 using System.Runtime.Remoting.Channels.Tcp;
@@ -24,7 +26,15 @@ namespace Project
             String masterServer = args[7]; // (Martelado)
 
             Uri uri = new Uri(url);
-            TcpChannel channel = new TcpChannel(uri.Port);
+
+            BinaryServerFormatterSinkProvider provider = new BinaryServerFormatterSinkProvider();
+
+            IDictionary props = new Hashtable();
+            props["port"] = uri.Port;
+            props["timeout"] = 3000; // in milliseconds
+            TcpChannel channel = new TcpChannel(props, null, provider);
+
+            //TcpChannel channel = new TcpChannel(uri.Port);
             ChannelServices.RegisterChannel(channel, false);
 
             ServerImpl MeetingServer = new ServerImpl(id,url,maxFaults,minDelay,maxDelay, puppetURL, masterServer);
@@ -45,6 +55,7 @@ namespace Project
         Dictionary<String, Proposal> Proposals;
         Dictionary<String, LocationMeetings> Meetings;
         Dictionary<String, int> Servers;
+        List<String> Available_Servers;
 
         string id;
         String url;
@@ -313,6 +324,8 @@ namespace Project
             this.Meetings = new Dictionary<string, LocationMeetings>();
             this.ClientsURLS = new Dictionary<String, String>();
             this.Servers = new Dictionary<string, int>();
+            this.Available_Servers = new List<String>();
+            this.Available_Servers.Add(url);
             this.Servers.Add(url, 0);
 
             this.puppetURL = puppetURL;
@@ -379,8 +392,9 @@ namespace Project
             {
                 received_commands.Add(command_id);
             }
-            
+
             UpdateServers(command);
+            Console.WriteLine("Acabei o close e correu tudo bem");
         }
 
         public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
@@ -408,7 +422,7 @@ namespace Project
             {
                 received_commands.Add(command.getCommandId());
             }
-            
+
             UpdateServers(command);
             ClientInterface c = this.Clients[coordinator];
             Console.WriteLine("Tenho " + this.Clients.Count + " clientes");
@@ -502,6 +516,7 @@ namespace Project
             c.Connect(this.url);
             Console.WriteLine("TENHO " + this.Proposals.Count + " PROPOSALS");
             c.InitializeMeetings(this.Proposals,this.Meetings);
+            c.getServers(this.Servers);
             lock (this.Clients)
             {
                 lock (this.ClientsURLS)
@@ -576,15 +591,15 @@ namespace Project
 
         public void UpdateServers(Command command)
         {
-            lock (this.Servers)
+            lock (this.Available_Servers)
             {
-                Thread[] pool = new Thread[this.Servers.Count - 1];
+                Thread[] pool = new Thread[this.Available_Servers.Count - 1];
                 int i = 0;
-                foreach(KeyValuePair<String, int> entry in this.Servers)
+                foreach (string serverURL in this.Available_Servers)
                 {
-                    if (this.url != entry.Key)
+                    if (this.url != serverURL)
                     {
-                        string url = entry.Key;
+                        string url = serverURL;
                         pool[i] = new Thread(() => DoUpdate(url, command));
                         pool[i].Start();
                         i++;
@@ -595,22 +610,48 @@ namespace Project
 
         private void DoUpdate(string url, Command command)
         {
-            ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-            si.UpdateMeeting(command, this.url, this.Servers);
+            try
+            {
+                ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
+                si.UpdateMeeting(command, this.url, this.Servers);
+            }
+            catch (SocketException)
+            {
+                Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo");
+                RemoveCrashedServer(url); //bug aqui
+            }
+        }
+
+        public void RemoveCrashedServer(String server_url)
+        {
+            this.Available_Servers.Remove(server_url);
+            foreach(String url in this.Available_Servers)
+            {
+                if(url != this.url)
+                {
+                    ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
+                    si.RemoveAvailableServer(server_url);
+                }
+            }
+        }
+
+        public void RemoveAvailableServer(String server_url)
+        {
+            this.Available_Servers.Remove(server_url);
         }
 
         public void UpdateServersClients(String clientUrl, String userName)
         {
-            lock (this.Servers)
+            lock (this.Available_Servers)
             {
 
-                Thread[] pool = new Thread[this.Servers.Count - 1];
+                Thread[] pool = new Thread[this.Available_Servers.Count - 1];
                 int i = 0;
-                foreach (KeyValuePair<String, int> entry in this.Servers)
+                foreach (String serverURL in this.Available_Servers)
                 {
-                    if(entry.Key != this.url)
+                    if(serverURL != this.url)
                     {
-                        string url = entry.Key;
+                        string url = serverURL;
                         pool[i] = new Thread(() => DoUpdateClient(url, clientUrl, userName));
                         pool[i].Start();
                         i++;
@@ -621,9 +662,17 @@ namespace Project
 
         private void DoUpdateClient(string serverUrl, string clientUrl, string userName)
         {
-            ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
-            Console.WriteLine("Sou o servidor e vou fazer update com o user " + userName);
-            si.UpdateClient(clientUrl, userName, this.url);
+            try
+            {
+                ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
+                Console.WriteLine("Sou o servidor e vou fazer update com o user " + userName);
+                si.UpdateClient(clientUrl, userName, this.url); //bug aqui??
+            }
+            catch (SocketException)
+            {
+                Console.WriteLine("O servidor " + serverUrl + " crashou.Vou remove-lo");
+                RemoveCrashedServer(serverUrl); //bug aqui
+            }
         }
 
         public void UpdateClient(string client_url, string userName, string serverURL)
@@ -785,7 +834,11 @@ namespace Project
         {
             lock (this.Servers)
             {
-                this.Servers.Add(serverURL, 0);
+                lock (this.Available_Servers)
+                {
+                    this.Servers.Add(serverURL, 0);
+                    this.Available_Servers.Add(serverURL);
+                }
             }
         }
 

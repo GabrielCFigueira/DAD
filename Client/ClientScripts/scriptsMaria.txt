@@ -1,3 +1,8 @@
-wait 1000
 create Pokemon 1 1 0 Lisboa,15-05-19
+create TouFarto 1 1 0 Lisboa,15-05-19
+create BomDia 1 1 0 Lisboa,15-05-19
+join Pokemon 1 Lisboa,15-05-19
+join TouFarto 1 Lisboa,15-05-19
+join BomDia 1 Lisboa,15-05-19
+close Pokemon
 list
