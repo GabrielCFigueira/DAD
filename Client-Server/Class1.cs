@@ -39,7 +39,7 @@ namespace Project
 
         void UpdateMeeting(Command command, string originalSender, string serverURL, Dictionary<string, int> vectorClock);
 
-        void UpdateClose(Command command, string topic, string serverURL, Dictionary<string, int> vectorClock);
+        void UpdateClose(Command command, string topic, string originalSender, string serverURL, Dictionary<string, int> vectorClock);
 
         void UpdateClient(String client_url, String userName, string serverURL);
 
