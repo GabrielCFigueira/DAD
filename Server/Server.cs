@@ -41,6 +41,7 @@ namespace Project
 
         Dictionary<String, ClientInterface> Clients;
         Dictionary<String, Proposal> Proposals;
+        Dictionary<String, String> ClientsURLS;
         Dictionary<String, LocationMeetings> Meetings;
         Dictionary<String, int> Servers;
         Dictionary<String, Command> Closes;
