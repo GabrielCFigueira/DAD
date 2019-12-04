@@ -741,7 +741,8 @@ namespace Project
                 {
                     Monitor.Wait(this.Servers);
                 }
-
+                Console.Write("LEFT WHILE");
+                printClocks(originalSender, vectorClock, this.Servers);
                 this.Servers[originalSender]++;
 
                 command.Execute(this);
@@ -759,6 +760,8 @@ namespace Project
                 {
                     Monitor.Wait(this.Servers);
                 }
+                Console.Write("LEFT WHILE");
+                printClocks(serverURL, vectorClock, this.Servers);
 
                 this.Servers[serverURL]++;
 
@@ -938,22 +941,24 @@ namespace Project
                 {
                     Monitor.Wait(this.Servers);
                 }
+                Console.Write("LEFT WHILE");
+                printClocks(serverURL, vectorClock, this.Servers);
 
-                lock(this.Closes) {
+                lock (this.Closes) {
 
                     lock (this.Tickets)
                     {
 
                         if (this.Tickets.ContainsKey(topic))
                         {
+                            Monitor.PulseAll(this.Servers);
+                            Monitor.PulseAll(this.Tickets);
                             return 0; //default value for already existing tickets FIXME fault tolerance
                                       //FIXME in case of failure, check with everyone
                         }
-                        else
-                        {
-                            ticket++;
-                            this.Tickets.Add(topic, new Ticket(ticket, serverURL, this.Closes[topic]));
-                        }
+                        
+                        ticket++;
+                        this.Tickets.Add(topic, new Ticket(ticket, serverURL, this.Closes[topic]));
                         Monitor.PulseAll(this.Servers);
                         Monitor.PulseAll(this.Tickets);
                         return ticket;
@@ -999,91 +1004,96 @@ namespace Project
                 {
                     Monitor.Wait(this.Servers);
                 }
+                Console.Write("LEFT WHILE");
+                printClocks(serverURL, vectorClock, this.Servers);
+
 
                 this.Servers[serverURL]++;
+                Monitor.PulseAll(this.Servers);
+            }
 
 
-                lock (this.Tickets)
-                {
-                    while (ticket - 1 != lastTicket)
-                    {
-                        Monitor.Wait(this.Tickets);
-                    }
-                    Monitor.PulseAll(this.Tickets);
-                }
+            lock (this.Tickets)
+            {
                 Console.WriteLine(topic + "achtung!2");
-                lock (this.Proposals)
+                while (ticket - 1 != lastTicket)
                 {
-                    lock (this.Meetings)
+                    Monitor.Wait(this.Tickets);
+                }
+                Monitor.PulseAll(this.Tickets);
+            }
+            Console.WriteLine(topic + "achtung!3");
+            lock (this.Proposals)
+            {
+                lock (this.Meetings)
+                {
+                    lock (this.Closes)
                     {
-                        lock (this.Closes)
+                        lock (this.Tickets)
                         {
-                            lock (this.Tickets)
+                            Console.WriteLine(topic + "achtung!4");
+                            if (am.isProposal())
                             {
-                                Console.WriteLine(topic + "achtung!3");
-                                if (am.isProposal())
+                                this.Proposals[topic] = (Proposal)am;
+                            }
+                            else
+                            {
+                                Meeting m = (Meeting)am;
+                                this.Meetings[m.Slot.Location.Local].addMeeting(m); //FIXME must replace, not add
+                                AbstractMeeting p = null;
+                                if (this.Proposals.ContainsKey(topic))
                                 {
-                                    this.Proposals[topic] = (Proposal)am;
+                                    p = this.Proposals[topic];
+                                    this.Proposals.Remove(topic);
                                 }
                                 else
                                 {
-                                    Meeting m = (Meeting)am;
-                                    this.Meetings[m.Slot.Location.Local].addMeeting(m); //FIXME must replace, not add
-                                    AbstractMeeting p = null;
-                                    if (this.Proposals.ContainsKey(topic))
+                                    foreach(Meeting meeting in this.Meetings[m.Slot.Location.Local].Meetings)
                                     {
-                                        p = this.Proposals[topic];
-                                        this.Proposals.Remove(topic);
-                                    }
-                                    else
-                                    {
-                                        foreach(Meeting meeting in this.Meetings[m.Slot.Location.Local].Meetings)
+                                        if(meeting.Topic == m.Topic)
                                         {
-                                            if(meeting.Topic == m.Topic)
-                                            {
-                                                p = meeting;
-                                                break;
-                                            }
+                                            p = meeting;
+                                            break;
                                         }
                                     }
+                                }
                                     
-                                    foreach (Attendee a in p.Attendees)
-                                    {
-                                        bool notIn = true;
-                                        foreach (Attendee attendee in m.Attendees)
-                                        {
-                                            if (attendee.Name == a.Name)
-                                            {
-                                                notIn = false;
-                                                break;
-                                            }
-                                        }
-                                        if (notIn && CouldAttend(m, a) && !this.Closes.ContainsKey(topic + a.Name))
-                                        {
-                                            List<string> slots = new List<string>();
-                                            foreach (Slot s in a.Available_slots)
-                                            {
-                                                slots.Add(s.Location.Local + "," + s.Date);
-                                            }
-                                            Command command = new DoJoin(topic, a.Name, slots);
-                                            pendingJoins.Add(a.Name, command);
-                                        }
-
-                                    }
-                                }
-                                
-                                if (this.masterServer != this.url)
+                                foreach (Attendee a in p.Attendees)
                                 {
-                                    this.Tickets.Add(topic, new Ticket(ticket, serverURL, this.Closes[topic]));
+                                    bool notIn = true;
+                                    foreach (Attendee attendee in m.Attendees)
+                                    {
+                                        if (attendee.Name == a.Name)
+                                        {
+                                            notIn = false;
+                                            break;
+                                        }
+                                    }
+                                    if (notIn && CouldAttend(m, a) && !this.Closes.ContainsKey(topic + a.Name))
+                                    {
+                                        List<string> slots = new List<string>();
+                                        foreach (Slot s in a.Available_slots)
+                                        {
+                                            slots.Add(s.Location.Local + "," + s.Date);
+                                        }
+                                        Command command = new DoJoin(topic, a.Name, slots);
+                                        pendingJoins.Add(a.Name, command);
+                                        Console.WriteLine("detected");
+                                    }
+
                                 }
-                                this.Closes.Remove(topic);
-                                lastTicket++;
-                                Monitor.PulseAll(this.Tickets);
                             }
+                                
+                            if (this.masterServer != this.url)
+                            {
+                                this.Tickets.Add(topic, new Ticket(ticket, serverURL, this.Closes[topic]));
+                            }
+                            this.Closes.Remove(topic);
+                            lastTicket++;
+                            Monitor.PulseAll(this.Tickets);
                         }
                     }
                 }
-                Monitor.PulseAll(this.Servers);
 
             }
 
@@ -1147,6 +1157,7 @@ namespace Project
                         {
                             this.Servers[this.url]--;
                             Monitor.PulseAll(this.Servers);
+                            Console.WriteLine("no ticket?");
                             return;
                         }
                         lock (this.Tickets)
