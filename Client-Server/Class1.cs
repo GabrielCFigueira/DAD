@@ -23,12 +23,6 @@ namespace Project
 
         void UpdateMeetings(Dictionary<String, Proposal> proposals, Dictionary<string, LocationMeetings> meetings);
 
-        void Gossip(Proposal p, int actualRound, int totalRounds, int numberOfMessages);
-
-        void UpdateUsers(Dictionary<String,String> clients);
-
-        void InitializeMeetings(Dictionary<string, Proposal> proposals, Dictionary<string, LocationMeetings> meetings);
-
     }
 
     public interface ServerInterface
@@ -39,25 +33,67 @@ namespace Project
 
         void JoinMeeting(String topic, String userName, List<String> slots);
 
-        void CloseMeeting(String userName,String topic);
+        void CloseMeeting(String userName, String topic);
 
-        void Connect(String URL,String userName);
+        void Connect(String URL, String userName);
 
-        void UpdateMeeting(Command command, string serverURL, Dictionary<string, int> vectorClock);
+        void UpdateMeeting(Command command, string originalSender, string serverURL, Dictionary<string, int> vectorClock);
 
-        void UpdateClient(String client_url,String userName, string serverURL);
+        void UpdateClose(Command command, string topic, string serverURL, Dictionary<string, int> vectorClock);
 
-        int GetTicket();
+        void UpdateClient(String client_url, String userName, string serverURL);
 
-        (String,String) getRandomClientName();
+        int GetTicket(string topic, string serverURL, Dictionary<string, int> vectorClock);
+
+        void ReceiveTicketResult(string topic, string serverURL, int ticket, AbstractMeeting am, Dictionary<string, int> vectorClock);
+
     }
 
     [Serializable]
     public abstract class Command
     {
-        string command_id;
+        private string topic;
+
+        public Command(string topic)
+        {
+            this.topic = topic;
+        }
+
+        public string Topic
+        {
+            get { return topic;  }
+        }
         public abstract AbstractMeeting Execute(ServerInterface si);
         public abstract string getCommandId();
+    }
+
+    public class Ticket
+    {
+        private int id;
+        private string serverURL;
+        private Command command;
+
+        public Ticket(int id, string serverURL, Command command)
+        {
+            this.id = id;
+            this.serverURL = serverURL;
+            this.command = command;
+        }
+
+        public int Id
+        {
+            get { return id; }
+        }
+
+        public string ServerURL
+        {
+            get { return serverURL; }
+        }
+
+        public Command Command
+        {
+            get { return command; }
+        }
     }
 
     [Serializable]
@@ -221,16 +257,22 @@ namespace Project
             {
                 message += s + " ";
             }
-            message += "\r\nAttendees: ";
+            message += "\r\nAttendees:\r\n";
             foreach (Attendee a in this.Attendees)
             {
-                message += a.Name + ", Available Slots: ";
+                message += "\t" + a.Name;
+                if (a.LateArrival)
+                {
+                    message += "(joined late)";
+                }
+                message += ", Available Slots: ";
                 foreach (Slot s in a.Available_slots)
                 {
                     message += s.Location.Local + "," + s.Date + " ";
                 }
+                message += "\r\n";
             }
-            message += "\r\nSelected Room: " + this.SelectedRoom.Name + "\r\n";
+            message += "Selected Room: " + this.SelectedRoom.Name + "\r\n";
             return message;
         }
     }
@@ -240,6 +282,7 @@ namespace Project
     {
         String name;
         List<Slot> available_slots;
+        bool lateArrival = false;
 
         public Attendee(String Name, List<Slot> Available_slots)
         {
@@ -257,6 +300,12 @@ namespace Project
         {
             get { return available_slots; }
             set { available_slots = value; }
+        }
+
+        public bool LateArrival
+        {
+            get { return lateArrival; }
+            set { lateArrival = value; }
         }
     }
 
@@ -317,16 +366,21 @@ namespace Project
             }
             else
             {
-                message += "\r\nAttendees: ";
+                message += "\r\nAttendees:\r\n";
                 foreach (Attendee a in this.Attendees)
                 {
-                    message += a.Name + ", Available Slots: ";
+                    message += "\t" + a.Name;
+                    if(a.LateArrival)
+                    {
+                        message += "(joined late)";
+                    }
+                    message += ", Available Slots: ";
                     foreach (Slot s in a.Available_slots)
                     {
                         message += s.Location.Local + "," + s.Date + " ";
                     }
+                    message += "\r\n";
                 }
-                message += "\r\n";
             }
             return message;
         }

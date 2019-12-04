@@ -174,7 +174,7 @@ namespace PuppetMaster
         }
     }
 
-    public class PuppetMasterImp : MarshalByRefObject, IPuppet
+    public class PuppetMasterImp : MarshalByRefObject
     {
         private List<Uri> pcsList;
         private Dictionary<string, Uri> serverDict;
@@ -246,12 +246,12 @@ namespace PuppetMaster
             switch (commands[0])
             {
                 case "Server":
-                    CreateServerDelegate serverDelegate = new CreateServerDelegate(createServer);
-                    serverDelegate.BeginInvoke(commands[1], commands[2], commands[3], commands[4], commands[5], "tcp://localhost:10001/PuppetMaster", masterServer, null, null);
-                    if(masterServer == "1")
+                    if (masterServer == "1")
                     {
                         masterServer = commands[2];
                     }
+                    CreateServerDelegate serverDelegate = new CreateServerDelegate(createServer);
+                    serverDelegate.BeginInvoke(commands[1], commands[2], commands[3], commands[4], commands[5], "tcp://localhost:10001/PuppetMaster", masterServer, null, null);
                     return command;
 
                 case "Client":
