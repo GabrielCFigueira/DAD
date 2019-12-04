@@ -334,6 +334,7 @@ namespace Project
             this.Clients = new Dictionary<String, ClientInterface>();
             this.Meetings = new Dictionary<string, LocationMeetings>();
             this.Servers = new Dictionary<string, int>();
+            this.ClientsURLS = new Dictionary<String, String>();
             this.Servers.Add(url, 0);
             this.Closes = new Dictionary<string, Command>();
             this.Tickets = new Dictionary<string, Ticket>();
