@@ -692,6 +692,7 @@ namespace Project
                 {
                     Console.WriteLine("Passei a conhecer o user " + userName);
                     this.Clients[userName] = ci;
+                    this.ClientsURLS[userName] = client_url; //rever isto
                 }
             }
         }
