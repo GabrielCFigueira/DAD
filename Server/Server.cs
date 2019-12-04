@@ -514,6 +514,15 @@ namespace Project
 
         }
 
+        public (String, String) getRandomClientName()
+        {
+            List<String> listClientNames = this.ClientsURLS.Keys.ToList();
+            Random random = new Random();
+            int randomIndex = random.Next(listClientNames.Count);
+            String chosenClientName = listClientNames[randomIndex];
+            return (chosenClientName, this.ClientsURLS[chosenClientName]);
+        }
+
         public void InitializeLocationsAndRooms()
         {
             StreamReader file = new StreamReader(@"..\..\..\Server\ServerConfig\Config.txt");
