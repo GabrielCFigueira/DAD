@@ -139,7 +139,7 @@ namespace Project
                     AbstractMeeting am = null;
                     if (!server.Proposals.ContainsKey(this.Topic)) //FIXME join antes do create
                     {
-                        Console.WriteLine("O cliente " + userName + " fez join atrasado a uma Meeting ja fechada");
+                        Console.WriteLine("O cliente " + userName + " fez join atrasado a uma Meeting ja fechada, vamos tentar juntá-lo");
                         foreach (LocationMeetings lm in server.Meetings.Values)
                         {
                             foreach (Meeting m in lm.Meetings)
@@ -625,7 +625,7 @@ namespace Project
         private void DoUpdateClient(string serverUrl, string clientUrl, string userName)
         {
             ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
-            Console.WriteLine("Sou o servidor e vou fazer update com o user " + userName);
+            Console.WriteLine("Sou o servidor e vou enviar o user " + userName + "para os outros servidores");
             si.UpdateClient(clientUrl, userName, this.url);
         }
 
@@ -733,7 +733,7 @@ namespace Project
 
                 Monitor.PulseAll(acks);
             }
-            Console.WriteLine(command_id);
+
             lock (this.Servers)
             {
                 printClocks(originalSender, vectorClock, this.Servers);
@@ -741,13 +741,10 @@ namespace Project
                 {
                     Monitor.Wait(this.Servers);
                 }
-                Console.Write("LEFT WHILE");
-                printClocks(originalSender, vectorClock, this.Servers);
                 this.Servers[originalSender]++;
 
                 command.Execute(this);
                 Monitor.PulseAll(this.Servers);
-                Console.WriteLine("join/create executed");
             }
         }
         public void UpdateClose(Command command, string topic, string serverURL, Dictionary<string, int> vectorClock)
@@ -760,8 +757,6 @@ namespace Project
                 {
                     Monitor.Wait(this.Servers);
                 }
-                Console.Write("LEFT WHILE");
-                printClocks(serverURL, vectorClock, this.Servers);
 
                 this.Servers[serverURL]++;
 
@@ -941,8 +936,6 @@ namespace Project
                 {
                     Monitor.Wait(this.Servers);
                 }
-                Console.Write("LEFT WHILE");
-                printClocks(serverURL, vectorClock, this.Servers);
 
                 lock (this.Closes) {
 
@@ -995,7 +988,6 @@ namespace Project
 
         public void ReceiveTicketResult(string topic, string serverURL, int ticket, AbstractMeeting am, Dictionary<string, int> vectorClock)
         {
-            Console.WriteLine(topic + "achtung!1");
             Dictionary<string, Command> pendingJoins = new Dictionary<string, Command>();
             lock (this.Servers)
             {
@@ -1004,8 +996,6 @@ namespace Project
                 {
                     Monitor.Wait(this.Servers);
                 }
-                Console.Write("LEFT WHILE");
-                printClocks(serverURL, vectorClock, this.Servers);
 
 
                 this.Servers[serverURL]++;
@@ -1015,14 +1005,12 @@ namespace Project
 
             lock (this.Tickets)
             {
-                Console.WriteLine(topic + "achtung!2");
                 while (ticket - 1 != lastTicket)
                 {
                     Monitor.Wait(this.Tickets);
                 }
                 Monitor.PulseAll(this.Tickets);
             }
-            Console.WriteLine(topic + "achtung!3");
             lock (this.Proposals)
             {
                 lock (this.Meetings)
@@ -1031,7 +1019,6 @@ namespace Project
                     {
                         lock (this.Tickets)
                         {
-                            Console.WriteLine(topic + "achtung!4");
                             if (am.isProposal())
                             {
                                 this.Proposals[topic] = (Proposal)am;
@@ -1078,7 +1065,6 @@ namespace Project
                                         }
                                         Command command = new DoJoin(topic, a.Name, slots);
                                         pendingJoins.Add(a.Name, command);
-                                        Console.WriteLine("detected");
                                     }
 
                                 }
@@ -1157,7 +1143,6 @@ namespace Project
                         {
                             this.Servers[this.url]--;
                             Monitor.PulseAll(this.Servers);
-                            Console.WriteLine("no ticket?");
                             return;
                         }
                         lock (this.Tickets)
