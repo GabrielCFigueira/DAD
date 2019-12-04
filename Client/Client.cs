@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Sockets;
 using System.Runtime.Remoting;
 using System.Runtime.Remoting.Channels;
 using System.Runtime.Remoting.Channels.Tcp;
@@ -25,7 +27,13 @@ namespace Project
 
                 Uri clientUri = new Uri(clientUrl);
 
-                TcpChannel channel = new TcpChannel(clientUri.Port);
+                BinaryServerFormatterSinkProvider provider = new BinaryServerFormatterSinkProvider();
+                IDictionary props = new Hashtable();
+                props["port"] = clientUri.Port;
+                props["timeout"] = 3000; // in milliseconds
+                TcpChannel channel = new TcpChannel(props, null, provider);
+
+                //TcpChannel channel = new TcpChannel(clientUri.Port);
                 ChannelServices.RegisterChannel(channel, false);
 
                 Console.WriteLine(userName);
@@ -97,6 +105,8 @@ namespace Project
         Dictionary<String, AbstractMeeting> Meetings;
         Dictionary<String, String> Clients;
         Dictionary<String, String> ClientsSent;
+        String Server_url;
+        List<String> KnownServers;
 
         public ClientImpl(String userName)
         {
@@ -104,6 +114,7 @@ namespace Project
             this.Meetings = new Dictionary<string, AbstractMeeting>();
             this.Clients = new Dictionary<String, String>();
             this.ClientsSent = new Dictionary<String, String>();
+            this.KnownServers = new List<String>();
         }
 
         public override object InitializeLifetimeService()
@@ -119,7 +130,16 @@ namespace Project
             switch (commandParams[0])
             {
                 case "list":
-                    this.ListMeetings();
+                    try
+                    {
+                        this.ListMeetings();
+                    }
+                    catch (SocketException)
+                    {
+                        this.Server_url = GetNextAvailableServer();
+                        this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                        this.ListMeetings();
+                    }
                     break;
                 case "create":
                     String meetingTopic = commandParams[1];
@@ -140,7 +160,16 @@ namespace Project
                             invitees.Add(invitee);
                         }
                     }
-                    this.CreateProposal(meetingTopic, min_attendees, n_slots, n_invitees, meeting_slots, invitees);
+                    try
+                    {
+                        this.CreateProposal(meetingTopic, min_attendees, n_slots, n_invitees, meeting_slots, invitees);
+                    }
+                    catch (SocketException)
+                    {
+                        this.Server_url = GetNextAvailableServer();
+                        this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                        this.CreateProposal(meetingTopic, min_attendees, n_slots, n_invitees, meeting_slots, invitees);
+                    }
                     break;
                 case "join":
                     String topic = commandParams[1];
@@ -151,11 +180,31 @@ namespace Project
                         string slot = commandParams[i];
                         slots.Add(slot);
                     }
-                    this.JoinMeeting(topic, slots);
+
+                    try
+                    {
+                        this.JoinMeeting(topic, slots);
+                    }
+                    catch (SocketException)
+                    {
+                        this.Server_url = GetNextAvailableServer();
+                        this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                        this.JoinMeeting(topic, slots);
+                    }
                     break;
                 case "close":
                     String meeting_topic = commandParams[1];
-                    this.CloseMeeting(meeting_topic);
+                    try
+                    {
+                        this.CloseMeeting(meeting_topic);
+                    }
+                    catch (SocketException e)
+                    {
+                        //Console.WriteLine(e.Message);
+                        this.Server_url = GetNextAvailableServer();
+                        this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                        this.CloseMeeting(meeting_topic);
+                    }
                     break;
                 case "wait":
                     int interval = Int32.Parse(commandParams[1]);
@@ -165,6 +214,28 @@ namespace Project
                     Console.WriteLine("Wrong Command");
                     break;
             }
+        }
+
+        public String GetNextAvailableServer()
+        {
+            int i;
+            String nextServer;
+            lock (this.KnownServers)
+            {
+                lock (this.Server_url)
+                {
+                    for (i = 0; i < this.KnownServers.Count; i++)
+                    {
+                        if (this.KnownServers[i] == this.Server_url)
+                        {
+                            break;
+                        }
+                    }
+                    nextServer = this.KnownServers[(i + 1) % this.KnownServers.Count];
+                }
+            }
+            Console.WriteLine("O proximo servidor e este: " + nextServer);
+            return nextServer;
         }
 
         public void CloseMeeting(String topic)
@@ -192,6 +263,7 @@ namespace Project
             Server = (ServerInterface)Activator.GetObject(
                 typeof(ServerInterface),
                 server_URL);
+            this.Server_url = server_URL;
             Console.WriteLine("Registei o servidor. Sou o/a " + this.UserName);
         }
 
@@ -257,21 +329,69 @@ namespace Project
 
         public void DoSpreadMessage(Proposal p, int actualRound, int totalRounds, int numberOfMessages)
         {
-            ServerInterface s = this.Server;
-            var chosenClientNameAndURL = s.getRandomClientName();
-            lock (this.ClientsSent)
-            {
-                while (chosenClientNameAndURL.Item1 == this.UserName || this.ClientsSent.ContainsKey(chosenClientNameAndURL.Item1))
-                {
-                    chosenClientNameAndURL = s.getRandomClientName();
-                }
+            //lock (this.Server)
+            //{
+            //lock (this.Server_url)
+            //{
+                    String actualServerUrl = this.Server_url;
+                    ServerInterface s = this.Server;
+                    String chosenClientName;
+                    String chosenClientURL;
 
-                this.ClientsSent.Add(chosenClientNameAndURL.Item1, chosenClientNameAndURL.Item2);
-            }
+                    try
+                    {
+                        (chosenClientName, chosenClientURL) = s.getRandomClientName();
+                    }
+                    catch (SocketException e)
+                    {
+                        lock (this.Server)
+                        {
+                            lock (this.Server_url)
+                            {
+                                if (actualServerUrl == this.Server_url)
+                                {
+                                    Console.WriteLine(e.Message);
+                                    this.Server_url = GetNextAvailableServer();
+                                    this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                                }
+                                (chosenClientName, chosenClientURL) = this.Server.getRandomClientName();
+                    }
+                        }
+                    }
+                    lock (this.ClientsSent)
+                    {
+                        while (chosenClientName == this.UserName || this.ClientsSent.ContainsKey(chosenClientName))
+                        {
+                            try
+                            {
+                                (chosenClientName, chosenClientURL) = s.getRandomClientName();
+                            }
+                            catch (SocketException)
+                            {
+                                lock (this.Server)
+                                {
+                                    lock (this.Server_url)
+                                    {
+                                        if (actualServerUrl == this.Server_url)
+                                        {
+                                            Console.WriteLine("O SERVIDOR " + this.Server_url + " CRASHOU");
+                                            this.Server_url = GetNextAvailableServer();
+                                            this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                                        }
+                                        (chosenClientName, chosenClientURL) = this.Server.getRandomClientName();
+                                    }
+                                }
+                            }
+                        }
 
-            Console.WriteLine("Mandei ao/a " + chosenClientNameAndURL);
-            ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), chosenClientNameAndURL.Item2);
-            chosenClient.Gossip(p, actualRound + 1, totalRounds, numberOfMessages);
+                        this.ClientsSent.Add(chosenClientName, chosenClientURL);
+                    }
+
+                    Console.WriteLine("Mandei ao/a " + chosenClientURL);
+                    ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), chosenClientURL);
+                    chosenClient.Gossip(p, actualRound + 1, totalRounds, numberOfMessages);
+                //}
+            //}
         }
 
         public void UpdateMeetings(Dictionary<string, Proposal> proposals, Dictionary<string, LocationMeetings> meetings)
@@ -347,6 +467,15 @@ namespace Project
                         this.Meetings[m.Topic] = m;
                     }
                 }
+            }
+        }
+
+        public void getServers(Dictionary<String, int> Servers)
+        {
+            foreach(String url in Servers.Keys)
+            {
+                KnownServers.Add(url);
+                Console.WriteLine("Ja conheco o servidor " + url);
             }
         }
     }
