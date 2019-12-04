@@ -47,6 +47,8 @@ namespace Project
 
         void ReceiveTicketResult(string topic, string serverURL, int ticket, AbstractMeeting am, Dictionary<string, int> vectorClock);
 
+        (String, String) getRandomClientName();
+
     }
 
     [Serializable]
