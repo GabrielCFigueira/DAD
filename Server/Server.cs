@@ -591,8 +591,8 @@ namespace Project
 
         public void UpdateServers(Command command)
         {
-            lock (this.Available_Servers)
-            {
+            //lock (this.Available_Servers)
+            //{
                 Thread[] pool = new Thread[this.Available_Servers.Count - 1];
                 int i = 0;
                 foreach (string serverURL in this.Available_Servers)
@@ -605,7 +605,7 @@ namespace Project
                         i++;
                     }
                 }
-            }
+            //}
         }
 
         private void DoUpdate(string url, Command command)
@@ -618,16 +618,20 @@ namespace Project
             catch (SocketException)
             {
                 Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo");
-                RemoveCrashedServer(url); //bug aqui
+                //RemoveCrashedServer(url);
+                lock (this.Available_Servers) //is this the fix??
+                {
+                    this.Available_Servers.Remove(url);
+                }
             }
         }
 
         public void RemoveCrashedServer(String server_url)
         {
             this.Available_Servers.Remove(server_url);
-            foreach(String url in this.Available_Servers)
+            foreach (String url in this.Available_Servers)
             {
-                if(url != this.url)
+                if (url != this.url)
                 {
                     ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
                     si.RemoveAvailableServer(server_url);
@@ -671,7 +675,11 @@ namespace Project
             catch (SocketException)
             {
                 Console.WriteLine("O servidor " + serverUrl + " crashou.Vou remove-lo");
-                RemoveCrashedServer(serverUrl); //bug aqui
+                //RemoveCrashedServer(serverUrl);
+                lock (this.Available_Servers) //is this the fix??
+                {
+                    this.Available_Servers.Remove(url);
+                }
             }
         }
 

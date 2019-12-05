@@ -130,15 +130,20 @@ namespace Project
             switch (commandParams[0])
             {
                 case "list":
-                    try
+                    while (true)
                     {
-                        this.ListMeetings();
-                    }
-                    catch (SocketException)
-                    {
-                        this.Server_url = GetNextAvailableServer();
-                        this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
-                        this.ListMeetings();
+                        try
+                        {
+                            this.ListMeetings();
+                            break;
+                        }
+                        catch (SocketException)
+                        {
+                            this.Server_url = GetNextAvailableServer();
+                            this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                            //this.ListMeetings();
+                            //break;
+                        }
                     }
                     break;
                 case "create":
@@ -160,15 +165,20 @@ namespace Project
                             invitees.Add(invitee);
                         }
                     }
-                    try
+                    while (true)
                     {
-                        this.CreateProposal(meetingTopic, min_attendees, n_slots, n_invitees, meeting_slots, invitees);
-                    }
-                    catch (SocketException)
-                    {
-                        this.Server_url = GetNextAvailableServer();
-                        this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
-                        this.CreateProposal(meetingTopic, min_attendees, n_slots, n_invitees, meeting_slots, invitees);
+                        try
+                        {
+                            this.CreateProposal(meetingTopic, min_attendees, n_slots, n_invitees, meeting_slots, invitees);
+                            break;
+                        }
+                        catch (SocketException)
+                        {
+                            this.Server_url = GetNextAvailableServer();
+                            this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                            //this.CreateProposal(meetingTopic, min_attendees, n_slots, n_invitees, meeting_slots, invitees);
+                            //break;
+                        }
                     }
                     break;
                 case "join":
@@ -181,29 +191,40 @@ namespace Project
                         slots.Add(slot);
                     }
 
-                    try
+                    while (true)
                     {
-                        this.JoinMeeting(topic, slots);
-                    }
-                    catch (SocketException)
-                    {
-                        this.Server_url = GetNextAvailableServer();
-                        this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
-                        this.JoinMeeting(topic, slots);
+                        try
+                        {
+                            this.JoinMeeting(topic, slots);
+                            break;
+                        }
+                        catch (SocketException)
+                        {
+                            this.Server_url = GetNextAvailableServer();
+                            this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                            //this.JoinMeeting(topic, slots);
+                            //break;
+                        }
                     }
                     break;
                 case "close":
                     String meeting_topic = commandParams[1];
-                    try
+
+                    while (true)
                     {
-                        this.CloseMeeting(meeting_topic);
-                    }
-                    catch (SocketException e)
-                    {
-                        //Console.WriteLine(e.Message);
-                        this.Server_url = GetNextAvailableServer();
-                        this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
-                        this.CloseMeeting(meeting_topic);
+                        try
+                        {
+                            this.CloseMeeting(meeting_topic);
+                            break;
+                        }
+                        catch (SocketException e)
+                        {
+                            //Console.WriteLine(e.Message);
+                            this.Server_url = GetNextAvailableServer();
+                            this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                            //this.CloseMeeting(meeting_topic);
+                            //break;
+                        }
                     }
                     break;
                 case "wait":
