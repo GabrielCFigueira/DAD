@@ -1,7 +1,1 @@
-wait 2000
-join Pokemon 2 Lisboa,15-05-19 Braga,18-05-19
-create Azeite 1 3 2 Lisboa,15-05-19 Porto,16-05-19 Braga,18-05-19 Joao Pedro
-join Azeite 1 Braga,18-05-19
-wait 4500
-close Azeite
 list
