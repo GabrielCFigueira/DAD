@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Sockets;
 using System.Runtime.Remoting;
 using System.Runtime.Remoting.Channels;
 using System.Runtime.Remoting.Channels.Tcp;
@@ -25,7 +27,13 @@ namespace Project
 
                 Uri clientUri = new Uri(clientUrl);
 
-                TcpChannel channel = new TcpChannel(clientUri.Port);
+                BinaryServerFormatterSinkProvider provider = new BinaryServerFormatterSinkProvider();
+                IDictionary props = new Hashtable();
+                props["port"] = clientUri.Port;
+                props["timeout"] = 3000; // in milliseconds
+                TcpChannel channel = new TcpChannel(props, null, provider);
+
+                //TcpChannel channel = new TcpChannel(clientUri.Port);
                 ChannelServices.RegisterChannel(channel, false);
 
                 Console.WriteLine(userName);
@@ -89,16 +97,26 @@ namespace Project
         }
     }
 
+
     class ClientImpl : MarshalByRefObject, ClientInterface
     {
         String UserName;
         ServerInterface Server;
         Dictionary<String, AbstractMeeting> Meetings;
+        Dictionary<String, AbstractMeeting> AllMeetings;
+        Dictionary<String, String> Clients;
+        Dictionary<String, String> ClientsSent;
+        String Server_url;
+        List<String> KnownServers;
 
         public ClientImpl(String userName)
         {
             this.UserName = userName;
             this.Meetings = new Dictionary<string, AbstractMeeting>();
+            this.AllMeetings = new Dictionary<string, AbstractMeeting>();
+            this.Clients = new Dictionary<String, String>();
+            this.ClientsSent = new Dictionary<String, String>();
+            this.KnownServers = new List<String>();
         }
 
         public override object InitializeLifetimeService()
@@ -114,7 +132,21 @@ namespace Project
             switch (commandParams[0])
             {
                 case "list":
-                    this.ListMeetings();
+                    while (true)
+                    {
+                        try
+                        {
+                            this.ListMeetings();
+                            break;
+                        }
+                        catch (SocketException)
+                        {
+                            this.Server_url = GetNextAvailableServer();
+                            this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                            //this.ListMeetings();
+                            //break;
+                        }
+                    }
                     break;
                 case "create":
                     String meetingTopic = commandParams[1];
@@ -135,7 +167,21 @@ namespace Project
                             invitees.Add(invitee);
                         }
                     }
-                    this.CreateProposal(meetingTopic, min_attendees, n_slots, n_invitees, meeting_slots, invitees);
+                    while (true)
+                    {
+                        try
+                        {
+                            this.CreateProposal(meetingTopic, min_attendees, n_slots, n_invitees, meeting_slots, invitees);
+                            break;
+                        }
+                        catch (SocketException)
+                        {
+                            this.Server_url = GetNextAvailableServer();
+                            this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                            //this.CreateProposal(meetingTopic, min_attendees, n_slots, n_invitees, meeting_slots, invitees);
+                            //break;
+                        }
+                    }
                     break;
                 case "join":
                     String topic = commandParams[1];
@@ -146,11 +192,42 @@ namespace Project
                         string slot = commandParams[i];
                         slots.Add(slot);
                     }
-                    this.JoinMeeting(topic, slots);
+
+                    while (true)
+                    {
+                        try
+                        {
+                            this.JoinMeeting(topic, slots);
+                            break;
+                        }
+                        catch (SocketException)
+                        {
+                            this.Server_url = GetNextAvailableServer();
+                            this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                            //this.JoinMeeting(topic, slots);
+                            //break;
+                        }
+                    }
                     break;
                 case "close":
                     String meeting_topic = commandParams[1];
-                    this.CloseMeeting(meeting_topic);
+
+                    while (true)
+                    {
+                        try
+                        {
+                            this.CloseMeeting(meeting_topic);
+                            break;
+                        }
+                        catch (SocketException e)
+                        {
+                            //Console.WriteLine(e.Message);
+                            this.Server_url = GetNextAvailableServer();
+                            this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                            //this.CloseMeeting(meeting_topic);
+                            //break;
+                        }
+                    }
                     break;
                 case "wait":
                     int interval = Int32.Parse(commandParams[1]);
@@ -160,6 +237,28 @@ namespace Project
                     Console.WriteLine("Wrong Command");
                     break;
             }
+        }
+
+        public String GetNextAvailableServer()
+        {
+            int i;
+            String nextServer;
+            lock (this.KnownServers)
+            {
+                lock (this.Server_url)
+                {
+                    for (i = 0; i < this.KnownServers.Count; i++)
+                    {
+                        if (this.KnownServers[i] == this.Server_url)
+                        {
+                            break;
+                        }
+                    }
+                    nextServer = this.KnownServers[(i + 1) % this.KnownServers.Count];
+                }
+            }
+            Console.WriteLine("O proximo servidor e este: " + nextServer);
+            return nextServer;
         }
 
         public void CloseMeeting(String topic)
@@ -187,7 +286,13 @@ namespace Project
             Server = (ServerInterface)Activator.GetObject(
                 typeof(ServerInterface),
                 server_URL);
+            this.Server_url = server_URL;
             Console.WriteLine("Registei o servidor. Sou o/a " + this.UserName);
+        }
+
+        public void UpdateUsers(Dictionary<String, String> clients)
+        {
+            this.Clients = clients;
         }
 
         public void PrintAllMeetings(string meetings)
@@ -200,34 +305,166 @@ namespace Project
             this.Meetings.Add(p.Topic, p);
         }
 
+        public void Gossip(Proposal p, int actualRound, int totalRounds, int numberOfMessages)
+        {
+            this.ClientsSent = new Dictionary<String, String>();
+            Console.WriteLine("Comecei o Gossip");
+            foreach (KeyValuePair<String, String> entry in this.Clients)
+            {
+                Console.WriteLine(entry.Value);
+            }
+
+            Console.WriteLine("Actual Round: " + actualRound);
+            Console.WriteLine("Total rounds: " + totalRounds);
+
+            if (actualRound > totalRounds)
+            {
+                Console.WriteLine("Acabou o gossip");
+                return;
+            }
+
+            AbstractMeeting am = (AbstractMeeting)p;
+
+
+            AbstractMeeting test;
+            this.Meetings.TryGetValue(am.Topic, out test);
+            if (test == null)
+                this.AllMeetings[p.Topic] = p;
+
+            lock (this.Meetings)
+            {
+                AbstractMeeting p2;
+                this.Meetings.TryGetValue(am.Topic, out p2);
+                if (p2 == null && am.N_invitees == 0)
+                {
+                    Console.WriteLine("Este proposal é aberta, sou o/a " + this.UserName + " e passei a conhecer a meeting com o Topic " + am.Topic);
+                    this.Meetings.Add(am.Topic, am);
+                }
+                else if (p2 == null && am.N_invitees != 0 && (am.Invitees.Contains(this.UserName) || this.UserName == am.Coordinator))
+                {
+                    Console.WriteLine("Este proposal é fechada e sou convidado/a, sou o/a " + this.UserName + " e passei a conhecer a meeting com o Topic " + am.Topic);
+                    this.Meetings.Add(am.Topic, am);
+                }
+            }
+
+            Console.WriteLine("Vou mandar " + numberOfMessages + " mensagens");
+            Thread[] pool = new Thread[numberOfMessages];
+            for (int i = 0; i < numberOfMessages; i++)
+            {
+                pool[i] = new Thread(() => DoSpreadMessage(p, actualRound, totalRounds, numberOfMessages));
+                pool[i].Start();
+            }
+        }
+
+        public void DoSpreadMessage(Proposal p, int actualRound, int totalRounds, int numberOfMessages)
+        {
+            //lock (this.Server)
+            //{
+            //lock (this.Server_url)
+            //{
+                    String actualServerUrl = this.Server_url;
+                    ServerInterface s = this.Server;
+                    String chosenClientName;
+                    String chosenClientURL;
+
+                    try
+                    {
+                        (chosenClientName, chosenClientURL) = s.getRandomClientName();
+                    }
+                    catch (SocketException e)
+                    {
+                        lock (this.Server)
+                        {
+                            lock (this.Server_url)
+                            {
+                                if (actualServerUrl == this.Server_url)
+                                {
+                                    Console.WriteLine(e.Message);
+                                    this.Server_url = GetNextAvailableServer();
+                                    this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                                }
+                                (chosenClientName, chosenClientURL) = this.Server.getRandomClientName();
+                    }
+                        }
+                    }
+                    lock (this.ClientsSent)
+                    {
+                        while (chosenClientName == this.UserName || this.ClientsSent.ContainsKey(chosenClientName))
+                        {
+                            try
+                            {
+                                (chosenClientName, chosenClientURL) = s.getRandomClientName();
+                            }
+                            catch (SocketException)
+                            {
+                                lock (this.Server)
+                                {
+                                    lock (this.Server_url)
+                                    {
+                                        if (actualServerUrl == this.Server_url)
+                                        {
+                                            Console.WriteLine("O SERVIDOR " + this.Server_url + " CRASHOU");
+                                            this.Server_url = GetNextAvailableServer();
+                                            this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                                        }
+                                        (chosenClientName, chosenClientURL) = this.Server.getRandomClientName();
+                                    }
+                                }
+                            }
+                        }
+
+                        this.ClientsSent.Add(chosenClientName, chosenClientURL);
+                    }
+
+                    Console.WriteLine("Mandei ao/a " + chosenClientURL);
+                    ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), chosenClientURL);
+                    chosenClient.Gossip(p, actualRound + 1, totalRounds, numberOfMessages);
+                //}
+            //}
+        }
+
         public void UpdateMeetings(Dictionary<string, Proposal> proposals, Dictionary<string, LocationMeetings> meetings)
         {
             foreach(KeyValuePair<String, Proposal> entry in proposals)
             {
+
+                AbstractMeeting test;
+                this.Meetings.TryGetValue(entry.Key, out test);
+                if (test == null)
+                    this.AllMeetings[entry.Key] = entry.Value;
                 //Proposal que veio do servidor
                 Proposal p1 = entry.Value;
 
                 //Respetivo proposal no cliente
                 AbstractMeeting p2;
-                this.Meetings.TryGetValue(p1.Topic, out p2);
-                if(p2 != null && p1.Version > p2.Version)  //  || p2 == null  shouldnt be necessary in the condition TODO why?
+                lock (this.Meetings)
                 {
-                    this.Meetings[p1.Topic] = p1;
-                } 
+                    this.Meetings.TryGetValue(p1.Topic, out p2);
+                    if (p2 != null && p1.Version > p2.Version)  //  || p2 == null  shouldnt be necessary in the condition TODO why?
+                    {
+                        this.Meetings[p1.Topic] = p1;
+                    }
+                }
             }
 
 
             foreach (KeyValuePair<string, LocationMeetings> entry in meetings)
             {
-                foreach (Meeting m1 in entry.Value.Meetings) { 
+                foreach (Meeting m1 in entry.Value.Meetings) {
 
-
+                    AbstractMeeting test;
+                    this.Meetings.TryGetValue(m1.Topic, out test);
+                    if (test == null)
+                        this.AllMeetings[entry.Key] = m1;
                     //Respetivo meeting no cliente
                     AbstractMeeting m2;
-                    this.Meetings.TryGetValue(m1.Topic, out m2);
-                    if ((m2 != null && m1.Version > m2.Version) || m2 == null) //  || m2 == null  shouldnt be necessary in the condition TODO why?
+                    lock (this.Meetings)
                     {
-                        this.Meetings[m1.Topic] = m1;
+                        this.Meetings.TryGetValue(m1.Topic, out m2);
+                        if ((m2 != null && m1.Version > m2.Version) || m2 == null) //  || m2 == null  shouldnt be necessary in the condition TODO why?
+                        {
+                            this.Meetings[m1.Topic] = m1;
+                        }
                     }
                 }
             }
@@ -237,6 +474,89 @@ namespace Project
                 AbstractMeeting m = entry.Value;
                 Console.WriteLine(m.PrintInfo());
             }
+        }
+
+        public void UpdateMeetingsFromClient()
+        {
+            Console.WriteLine("Entrei a meio da execucao");
+            foreach (KeyValuePair<String, AbstractMeeting> entry in this.AllMeetings)
+            {
+                /*AbstractMeeting test;
+                this.Meetings.TryGetValue(entry.Key, out test);
+                if (test == null)
+                    this.AllMeetings[entry.Key] = entry.Value;*/
+                
+                AbstractMeeting am1 = entry.Value;
+
+                lock (this.Meetings)
+                {
+                    AbstractMeeting test;
+                    this.Meetings.TryGetValue(entry.Key, out test);
+                    if (test == null && am1.N_invitees == 0)
+                    {
+                        this.Meetings[am1.Topic] = am1;
+                        Console.WriteLine("Esta meeting e aberta. Passei a conhece-la");
+                    }
+                    else if (test == null && am1.N_invitees != 0 && am1.Invitees.Contains(this.UserName))
+                    {
+                        this.Meetings[am1.Topic] = am1;
+                        Console.WriteLine("Esta meeting e fechada e sou convidado.");
+                    }
+                }
+            }
+        }
+
+        public void InitializeMeetings(Dictionary<string, Proposal> proposals, Dictionary<string, LocationMeetings> meetings)
+        {
+            foreach (KeyValuePair<String, Proposal> entry in proposals)
+            {
+                AbstractMeeting p = (AbstractMeeting) entry.Value;
+                Console.WriteLine("Vou ter esta proposal sobre " + p.Topic);
+                lock (this.Meetings)
+                {
+                    if (p.N_invitees == 0 || (p.N_invitees != 0 && (p.Invitees.Contains(this.UserName) || this.UserName == p.Coordinator)))
+                    {
+                        this.Meetings[p.Topic] = p;
+                        Console.WriteLine("Tenho esta proposal sobre " + p.Topic);
+                    }
+                }
+            }
+
+
+            foreach (KeyValuePair<string, LocationMeetings> entry in meetings)
+            {
+                foreach (Meeting m1 in entry.Value.Meetings)
+                {
+                    AbstractMeeting m = (AbstractMeeting) m1;
+
+                    lock (this.Meetings)
+                    {
+                        this.Meetings[m.Topic] = m;
+                    }
+                }
+            }
+        }
+
+        public void getServers(Dictionary<String, int> Servers)
+        {
+            foreach(String url in Servers.Keys)
+            {
+                KnownServers.Add(url);
+                Console.WriteLine("Ja conheco o servidor " + url);
+            }
+        }
+
+        public void AskNeighbourForMeetings(String clientName, String clientURL)
+        {
+            ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), clientURL);
+            Dictionary<String, AbstractMeeting> meetings = chosenClient.getAllMeetings();
+            this.AllMeetings = meetings;
+            this.UpdateMeetingsFromClient();
+        }
+
+        public Dictionary<String,AbstractMeeting> getAllMeetings()
+        {
+            return this.AllMeetings;
         }
     }
 }

@@ -1,7 +1,10 @@
 ﻿using Puppet_Server;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Net.Sockets;
 using System.Runtime.Remoting;
 using System.Runtime.Remoting.Channels;
 using System.Runtime.Remoting.Channels.Tcp;
@@ -23,7 +26,15 @@ namespace Project
             String masterServer = args[7]; // (Martelado)
 
             Uri uri = new Uri(url);
-            TcpChannel channel = new TcpChannel(uri.Port);
+
+            BinaryServerFormatterSinkProvider provider = new BinaryServerFormatterSinkProvider();
+
+            IDictionary props = new Hashtable();
+            props["port"] = uri.Port;
+            props["timeout"] = 3000; // in milliseconds
+            TcpChannel channel = new TcpChannel(props, null, provider);
+
+            //TcpChannel channel = new TcpChannel(uri.Port);
             ChannelServices.RegisterChannel(channel, false);
 
             ServerImpl MeetingServer = new ServerImpl(id,url,maxFaults,minDelay,maxDelay, puppetURL, masterServer);
@@ -40,11 +51,13 @@ namespace Project
     {
 
         Dictionary<String, ClientInterface> Clients;
+        Dictionary<String, String> ClientsURLS;
         Dictionary<String, Proposal> Proposals;
         Dictionary<String, LocationMeetings> Meetings;
         Dictionary<String, int> Servers;
         Dictionary<String, Command> Closes;
         Dictionary<string, Ticket> Tickets;
+        List<String> Available_Servers;
 
         string id;
         string url;
@@ -372,7 +385,10 @@ namespace Project
             this.Proposals = new Dictionary<String, Proposal>();
             this.Clients = new Dictionary<String, ClientInterface>();
             this.Meetings = new Dictionary<string, LocationMeetings>();
+            this.ClientsURLS = new Dictionary<String, String>();
             this.Servers = new Dictionary<string, int>();
+            this.Available_Servers = new List<String>();
+            this.Available_Servers.Add(url);
             this.Servers.Add(url, 0);
             this.Closes = new Dictionary<string, Command>();
             this.Tickets = new Dictionary<string, Ticket>();
@@ -444,32 +460,20 @@ namespace Project
             {
                 received_commands.Add(command.getCommandId());
             }
-            
+
             UpdateServers(command, this.url, this.Servers);
+            ClientInterface c = this.Clients[coordinator];
+            Console.WriteLine("Tenho " + this.Clients.Count + " clientes");
+            int numberOfMessages = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2));
+            int totalRounds;
+            if(numberOfMessages == 1)
+                totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2));
+            else
+                totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, numberOfMessages));
+            totalRounds += 2; //this is for gossip
+            //c.AddProposal(p);
+            c.Gossip(p,1,totalRounds,numberOfMessages);
             
-            if (n_invitees > 0)
-            {
-                foreach (String s in invitees)
-                {
-                    ClientInterface c = this.Clients[s];
-                    c.AddProposal(p);
-                }
-                try
-                { //in case the coordinator invites himself
-                    this.Clients[coordinator].AddProposal(p);
-                } catch (ArgumentException e)
-                {
-                    Console.WriteLine("O utilizador " + coordinator + " convidou-se a si mesmo");
-                }
-            }
-            else if (n_invitees == 0)
-            {
-                foreach (KeyValuePair<String, ClientInterface> entry in Clients)
-                {
-                    ClientInterface c = entry.Value;
-                    c.AddProposal(p);
-                }
-            }
         }
 
         public void JoinMeeting(String topic, String userName, List<String> slots)
@@ -536,13 +540,36 @@ namespace Project
 
         public void Connect(string client_URL, string userName)
         {
+            //this.UpdateServersClients(client_URL, userName); // rever isto
             ClientInterface c = (ClientInterface)Activator.GetObject(
                  typeof(ClientInterface),
                  client_URL);
             c.Connect(this.url);
+            Console.WriteLine("TENHO " + this.Proposals.Count + " PROPOSALS");
+            //c.InitializeMeetings(this.Proposals,this.Meetings);
+            c.getServers(this.Servers);
             lock (this.Clients)
             {
-                Clients.Add(userName, c);
+                lock (this.ClientsURLS)
+                {
+                    if(this.Clients.Count != 0)
+                    {
+                        Console.WriteLine("Ja existem mais clientes. Vai pedir os meetings a um deles.");
+                        String clientName;
+                        String clientURL;
+                        (clientName,clientURL) = this.getRandomClientName();
+                        c.AskNeighbourForMeetings(clientName,clientURL);
+                    }
+                    Clients.Add(userName, c);
+                    ClientsURLS.Add(userName, client_URL);
+
+                    /*foreach (KeyValuePair<String, ClientInterface> entry in this.Clients)
+                    {
+                        ClientInterface ci = entry.Value;
+                        //ci.UpdateUsers(this.Clients);
+                        ci.UpdateUsers(this.ClientsURLS);
+                    }*/
+                }
             }
 
             lock (received_commands)
@@ -553,6 +580,16 @@ namespace Project
             this.UpdateServersClients(client_URL, userName);
             Console.WriteLine("Registei o/a cliente " + userName);
 
+
+        }
+
+        public (String,String) getRandomClientName()
+        {
+            List<String> listClientNames = this.ClientsURLS.Keys.ToList();
+            Random random = new Random();
+            int randomIndex = random.Next(listClientNames.Count);
+            String chosenClientName = listClientNames[randomIndex];
+            return (chosenClientName,this.ClientsURLS[chosenClientName]);
         }
 
         public void InitializeLocationsAndRooms()
@@ -593,15 +630,15 @@ namespace Project
 
         public void PropagateClose(Command command, string topic, string senderURL, Dictionary<string, int> vectorClock)
         {
-            lock (this.Servers)
+            lock (this.Available_Servers)
             {
-                Thread[] pool = new Thread[this.Servers.Count - 1];
+                Thread[] pool = new Thread[this.Available_Servers.Count - 1];
                 int i = 0;
-                foreach (KeyValuePair<String, int> entry in this.Servers)
+                foreach (string serverURL in this.Available_Servers)
                 {
-                    if (this.url != entry.Key)
+                    if (this.url != serverURL)
                     {
-                        string url = entry.Key;
+                        string url = serverURL;
                         pool[i] = new Thread(() => DoPropagate(url, senderURL, command, topic, vectorClock));
                         pool[i].Start();
                         i++;
@@ -618,20 +655,20 @@ namespace Project
 
         public void UpdateServers(Command command, string senderURL, Dictionary<string, int> clock)
         {
-            lock (this.Servers)
+            lock (this.Available_Servers)
             {
-                Thread[] pool = new Thread[this.Servers.Count - 1];
+                Thread[] pool = new Thread[this.Available_Servers.Count - 1];
                 int i = 0;
                 Dictionary<string, int> vectorClock = new Dictionary<string, int>(clock);
                 if (senderURL == this.url)
                 {
                     this.waitBetweenRequests();
                 }
-                foreach (KeyValuePair<String, int> entry in this.Servers)
+                foreach (string serverURL in this.Available_Servers)
                 {
-                    if (this.url != entry.Key)
+                    if (this.url != serverURL)
                     {
-                        string url = entry.Key;
+                        string url = serverURL;
                         pool[i] = new Thread(() => DoUpdate(url, senderURL, command, vectorClock));
                         pool[i].Start();
                         i++;
@@ -643,22 +680,35 @@ namespace Project
 
         private void DoUpdate(string url, string senderURL, Command command, Dictionary<string, int> vectorClock)
         {
-            ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-            si.UpdateMeeting(command, senderURL, this.url, vectorClock);
+            try
+            {//FIXME
+                ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
+                si.UpdateMeeting(command, senderURL, this.url, vectorClock);
+            }
+            catch (SocketException)
+            {
+                Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo");
+                lock (this.Available_Servers) //is this the fix??
+                {
+                    this.Available_Servers.Remove(url);
+                }
+            }
         }
+
+        
 
         public void UpdateServersClients(String clientUrl, String userName)
         {
-            lock (this.Servers)
+            lock (this.Available_Servers) //FIXME
             {
 
-                Thread[] pool = new Thread[this.Servers.Count - 1];
+                Thread[] pool = new Thread[this.Available_Servers.Count - 1];
                 int i = 0;
-                foreach (KeyValuePair<String, int> entry in this.Servers)
+                foreach (String serverURL in this.Available_Servers)
                 {
-                    if(entry.Key != this.url)
+                    if(serverURL != this.url)
                     {
-                        string url = entry.Key;
+                        string url = serverURL;
                         pool[i] = new Thread(() => DoUpdateClient(url, clientUrl, userName));
                         pool[i].Start();
                         i++;
@@ -670,9 +720,21 @@ namespace Project
 
         private void DoUpdateClient(string serverUrl, string clientUrl, string userName)
         {
-            ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
-            Console.WriteLine("Sou o servidor e vou enviar o user " + userName + "para os outros servidores");
-            si.UpdateClient(clientUrl, userName, this.url);
+            try
+            {
+                ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), serverUrl);
+                Console.WriteLine("Sou o servidor e vou fazer update com o user " + userName);
+                si.UpdateClient(clientUrl, userName, this.url); //bug aqui??
+            }
+            catch (SocketException)
+            {
+                Console.WriteLine("O servidor " + serverUrl + " crashou.Vou remove-lo");
+                //RemoveCrashedServer(serverUrl);
+                lock (this.Available_Servers) //is this the fix??
+                {
+                    this.Available_Servers.Remove(url);
+                }
+            }
         }
 
         public void UpdateClient(string client_url, string userName, string serverURL)
@@ -729,6 +791,7 @@ namespace Project
                 {
                     Console.WriteLine("Passei a conhecer o user " + userName);
                     this.Clients[userName] = ci;
+                    this.ClientsURLS[userName] = client_url; //rever isto
                 }
             }
         }
@@ -886,8 +949,12 @@ namespace Project
         {
             lock (this.Servers)
             {
-                this.Servers.Add(serverURL, 0);
+                lock (this.Available_Servers)
+                {
+                    this.Servers.Add(serverURL, 0);
+                    this.Available_Servers.Add(serverURL);
                 Monitor.PulseAll(this.Servers);
+                           }
             }
         }
 

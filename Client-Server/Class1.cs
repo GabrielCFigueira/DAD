@@ -23,6 +23,18 @@ namespace Project
 
         void UpdateMeetings(Dictionary<String, Proposal> proposals, Dictionary<string, LocationMeetings> meetings);
 
+        void Gossip(Proposal p, int actualRound, int totalRounds, int numberOfMessages);
+
+        void UpdateUsers(Dictionary<String,String> clients);
+
+        void InitializeMeetings(Dictionary<string, Proposal> proposals, Dictionary<string, LocationMeetings> meetings);
+
+        void getServers(Dictionary<String, int> Servers);
+
+        void AskNeighbourForMeetings(String clientName, String clientURL);
+
+        Dictionary<String, AbstractMeeting> getAllMeetings();
+
     }
 
     public interface ServerInterface
@@ -46,6 +58,8 @@ namespace Project
         int GetTicket(string topic, string serverURL, Dictionary<string, int> vectorClock);
 
         void ReceiveTicketResult(string topic, string originalSender, string serverURL, int ticket, AbstractMeeting am, Dictionary<string, int> vectorClock);
+
+        (String,String) getRandomClientName();
 
     }
 
