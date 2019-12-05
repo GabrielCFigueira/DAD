@@ -94,6 +94,10 @@ namespace Project
                 {
                     lock (server.Clients)
                     {
+                        if(server.Proposals.ContainsKey(this.Topic)) //idempotency
+                        {
+                            return server.Proposals[this.Topic];
+                        }
                         Dictionary<String, Slot> Slots = new Dictionary<String, Slot>();
                         foreach (String s in slots)
                         {
@@ -123,12 +127,16 @@ namespace Project
             string command_id;
             string userName;
             List<string> slots;
-            public DoJoin(string topic, string userName, List<string> slots)
+            Dictionary<string, int> vectorClock;
+            string serverURL;
+            public DoJoin(string topic, string userName, List<string> slots, Dictionary<string,int> vectorClock, string serverURL)
                 : base(topic)
             {
                 this.userName = userName;
                 this.slots = slots;
                 this.command_id = topic +  userName;
+                this.vectorClock = new Dictionary<string, int>(vectorClock);
+                this.serverURL = serverURL;
             }
 
             override public AbstractMeeting Execute(ServerInterface si)
@@ -152,7 +160,7 @@ namespace Project
                                         Console.WriteLine("Mas não há espaço suficiente");
                                         return am;
                                     }
-                                        goto label;
+                                    goto label;
                                 }
                             }
                         }
@@ -178,7 +186,7 @@ namespace Project
                             Slots.Add(slot);
                         }
 
-                        Attendee a = new Attendee(userName, Slots);
+                        Attendee a = new Attendee(userName, Slots, vectorClock, serverURL);
                         if(!am.isProposal())
                         {
                             a.LateArrival = true;
@@ -205,6 +213,29 @@ namespace Project
         [Serializable]
         private class DoClose : Command
         {
+            private class JoinSorter : IComparer<Attendee>
+            {
+                public int Compare(Attendee a, Attendee b)
+                {
+                    int result = 0;
+
+                    if (checkClock(a.ServerURL, a.VectorClock, b.VectorClock))
+                        result++;
+
+                    if (checkClock(b.ServerURL, b.VectorClock, a.VectorClock))
+                        result--;
+
+                    if(result == 0)
+                    {
+                        result = -string.Compare(a.Name, b.Name, comparisonType: StringComparison.OrdinalIgnoreCase);
+                    }
+                    return result;
+                }
+
+
+
+            }
+
             string command_id;
             string userName;
 
@@ -293,14 +324,18 @@ namespace Project
                                         }
                                     }
                                 }
-
-                                while (attendees.Count > selectedRoom.Capacity)
+                                if (attendees.Count > selectedRoom.Capacity)
                                 {
-                                    attendees.RemoveAt(attendees.Count - 1); //FIXME decide who to remove
+                                    attendees.Sort(new JoinSorter());
+                                    do
+                                    {
+                                        attendees.RemoveAt(attendees.Count - 1);
+                                    }
+                                    while (attendees.Count > selectedRoom.Capacity);
                                 }
 
                                 Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, attendees);
-                                server.Meetings[chosenSlot.Location.Local].addMeeting(meeting);
+                                server.Meetings[chosenSlot.Location.Local].addMeeting(meeting); //FIXME dont add repeated meetings
                                 server.Proposals.Remove(p.Topic);
 
                                 return meeting;
@@ -362,7 +397,7 @@ namespace Project
         {
             this.waitBetweenRequests();
 
-            lock (this)
+            lock (this) //FIXME freeze entre servidores
             {
                 while (freeze)
                 {
@@ -448,20 +483,20 @@ namespace Project
 
             if (!this.Proposals.ContainsKey(topic)) //FIXME pending create? FIXME lock nas Proposals
             {
-                Command command = new DoJoin(topic, userName, slots);
-                ExecuteTicket(command, userName);
+                return; //FIXME give error message
             }
             else
             {
-                Command command = new DoJoin(topic, userName, slots);
-                lock (received_commands)
-                {
-                    received_commands.Add(command.getCommandId());
-                }
                 lock (this.Servers)
                 {
-                    command.Execute(this);
                     this.Servers[this.url]++;
+                    Command command = new DoJoin(topic, userName, slots, this.Servers, this.url);
+                    lock (received_commands)
+                    {
+                        received_commands.Add(command.getCommandId());
+                    }
+                    command.Execute(this);
+
 
                     UpdateServers(command, this.url, this.Servers);
                     Monitor.PulseAll(this.Servers);
@@ -726,7 +761,7 @@ namespace Project
             int x = f + 1;
             lock (acks)
             {
-                while (acks[command_id].Count < x)
+                while (acks[command_id].Count < x) //FIXME || acks[command_id].Count < this.Servers.Count)
                 {
                     Monitor.Wait(acks);
                 }
@@ -737,7 +772,7 @@ namespace Project
             lock (this.Servers)
             {
                 printClocks(originalSender, vectorClock, this.Servers);
-                while (!checkClock(originalSender, vectorClock))
+                while (!checkClock(originalSender, vectorClock, this.Servers))
                 {
                     Monitor.Wait(this.Servers);
                 }
@@ -753,7 +788,7 @@ namespace Project
             lock (this.Servers)
             {
                 printClocks(serverURL, vectorClock, this.Servers);
-                while (!checkClock(serverURL, vectorClock))
+                while (!checkClock(serverURL, vectorClock, this.Servers))
                 {
                     Monitor.Wait(this.Servers);
                 }
@@ -770,16 +805,16 @@ namespace Project
             
         }
 
-        private bool checkClock(string serverURL, Dictionary<string, int> vectorClock)
+        public static bool checkClock(string serverURL, Dictionary<string, int> clock1, Dictionary<string, int> clock2)
         {
             
-            foreach (KeyValuePair<string, int> entry in this.Servers)
+            foreach (KeyValuePair<string, int> entry in clock1)
             {
-                if (serverURL != entry.Key && entry.Value < vectorClock[entry.Key])
+                if (serverURL != entry.Key && entry.Value < clock1[entry.Key])
                 {
                     return false;
                 }
-                else if (serverURL == entry.Key && entry.Value < vectorClock[entry.Key] - 1)
+                else if (serverURL == entry.Key && entry.Value < clock2[entry.Key] - 1)
                 {
                     return false;
                 }
@@ -932,7 +967,7 @@ namespace Project
             lock (this.Servers)
             {
                 printClocks(serverURL, vectorClock, this.Servers);
-                while (!checkClock(serverURL, vectorClock))
+                while (!checkClock(serverURL, vectorClock, this.Servers))
                 {
                     Monitor.Wait(this.Servers);
                 }
@@ -992,7 +1027,7 @@ namespace Project
             lock (this.Servers)
             {
                 printClocks(serverURL, vectorClock, this.Servers);
-                while (!checkClock(serverURL, vectorClock))
+                while (!checkClock(serverURL, vectorClock, this.Servers))
                 {
                     Monitor.Wait(this.Servers);
                 }
@@ -1063,7 +1098,7 @@ namespace Project
                                         {
                                             slots.Add(s.Location.Local + "," + s.Date);
                                         }
-                                        Command command = new DoJoin(topic, a.Name, slots);
+                                        Command command = new DoJoin(topic, a.Name, slots, this.Servers, this.url);
                                         pendingJoins.Add(a.Name, command);
                                     }
 

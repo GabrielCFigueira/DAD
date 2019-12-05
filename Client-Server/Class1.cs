@@ -283,11 +283,15 @@ namespace Project
         String name;
         List<Slot> available_slots;
         bool lateArrival = false;
+        Dictionary<string, int> vectorClock;
+        string serverURL;
 
-        public Attendee(String Name, List<Slot> Available_slots)
+        public Attendee(String Name, List<Slot> Available_slots, Dictionary<string, int> vectorClock, string serverURL)
         {
             this.name = Name;
             this.available_slots = Available_slots;
+            this.vectorClock = vectorClock;
+            this.serverURL = serverURL;
         }
 
         public String Name
@@ -306,6 +310,16 @@ namespace Project
         {
             get { return lateArrival; }
             set { lateArrival = value; }
+        }
+
+        public Dictionary<string, int> VectorClock
+        {
+            get { return this.vectorClock; }
+        }
+
+        public string ServerURL
+        {
+            get { return this.serverURL; }
         }
     }
 
