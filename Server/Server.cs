@@ -1225,7 +1225,6 @@ namespace Project
 
             foreach (KeyValuePair<string, Command> entry in pendingJoins)
             {
-                Console.WriteLine("detected");
                 ExecuteTicket(entry.Value, entry.Key);
             }
         }
@@ -1257,10 +1256,8 @@ namespace Project
             {
                 lock (this.Closes)
                 {
-                    Console.WriteLine(topic + "achtung!1");
                     if (this.Closes.ContainsKey(topic))
                     {
-                        Console.WriteLine("achtung!100 " + topic);
                         Monitor.PulseAll(this.Servers);
                         return;
                     }
@@ -1269,7 +1266,6 @@ namespace Project
                         received_commands.Add(command.getCommandId());
                     }
                     this.Closes.Add(topic, command);
-                    Console.WriteLine(topic + "achtung!2");
                     this.Servers[this.url]++;
                     Dictionary<string, int> clock = new Dictionary<string, int>(this.Servers);
                     PropagateClose(command, topic, this.url, clock);
@@ -1305,8 +1301,6 @@ namespace Project
                 Monitor.PulseAll(this.Servers);
             }
 
-            Console.WriteLine(topic + "achtung!3");
-
             lock (this.Tickets)
             {
                 while (newTicket - 1 != lastTicket)
@@ -1336,7 +1330,6 @@ namespace Project
             string msg_id = topic + newTicket;
             lock (received_commands) //Adding my message to my received_commands
             {
-                Console.WriteLine(msg_id);
                 received_commands.Add(msg_id);
             }
 
