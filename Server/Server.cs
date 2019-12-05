@@ -674,7 +674,7 @@ namespace Project
                         i++;
                     }
                 }
-                Monitor.PulseAll(this.Servers);
+                Monitor.PulseAll(this.Available_Servers);
             }
         }
 
@@ -714,7 +714,7 @@ namespace Project
                         i++;
                     }
                 }
-                Monitor.PulseAll(this.Servers);
+                Monitor.PulseAll(Available_Servers);
             }
         }
 
