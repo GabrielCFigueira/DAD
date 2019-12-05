@@ -874,7 +874,7 @@ namespace Project
                 {
                     return false;
                 }
-                else if (serverURL == entry.Key && entry.Value > clock2[entry.Key] + 1)
+                else if (serverURL == entry.Key && entry.Value != clock2[entry.Key] + 1 && entry.Value != clock2[entry.Key])
                 {
                     return false;
                 }
