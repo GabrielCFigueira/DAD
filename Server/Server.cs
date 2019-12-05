@@ -427,7 +427,11 @@ namespace Project
             ClientInterface c = this.Clients[coordinator];
             Console.WriteLine("Tenho " + this.Clients.Count + " clientes");
             int numberOfMessages = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2));
-            int totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, numberOfMessages));
+            int totalRounds;
+            if(numberOfMessages == 1)
+                totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2));
+            else
+                totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, numberOfMessages));
             totalRounds += 2; //this is for gossip
             //c.AddProposal(p);
             c.Gossip(p,1,totalRounds,numberOfMessages);
@@ -515,12 +519,20 @@ namespace Project
                  client_URL);
             c.Connect(this.url);
             Console.WriteLine("TENHO " + this.Proposals.Count + " PROPOSALS");
-            c.InitializeMeetings(this.Proposals,this.Meetings);
+            //c.InitializeMeetings(this.Proposals,this.Meetings);
             c.getServers(this.Servers);
             lock (this.Clients)
             {
                 lock (this.ClientsURLS)
                 {
+                    if(this.Clients.Count != 0)
+                    {
+                        Console.WriteLine("Ja existem mais clientes. Vai pedir os meetings a um deles.");
+                        String clientName;
+                        String clientURL;
+                        (clientName,clientURL) = this.getRandomClientName();
+                        c.AskNeighbourForMeetings(clientName,clientURL);
+                    }
                     Clients.Add(userName, c);
                     ClientsURLS.Add(userName, client_URL);
 

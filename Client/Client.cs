@@ -103,6 +103,7 @@ namespace Project
         String UserName;
         ServerInterface Server;
         Dictionary<String, AbstractMeeting> Meetings;
+        Dictionary<String, AbstractMeeting> AllMeetings;
         Dictionary<String, String> Clients;
         Dictionary<String, String> ClientsSent;
         String Server_url;
@@ -112,6 +113,7 @@ namespace Project
         {
             this.UserName = userName;
             this.Meetings = new Dictionary<string, AbstractMeeting>();
+            this.AllMeetings = new Dictionary<string, AbstractMeeting>();
             this.Clients = new Dictionary<String, String>();
             this.ClientsSent = new Dictionary<String, String>();
             this.KnownServers = new List<String>();
@@ -323,6 +325,12 @@ namespace Project
 
             AbstractMeeting am = (AbstractMeeting)p;
 
+
+            AbstractMeeting test;
+            this.Meetings.TryGetValue(am.Topic, out test);
+            if (test == null)
+                this.AllMeetings[p.Topic] = p;
+
             lock (this.Meetings)
             {
                 AbstractMeeting p2;
@@ -419,6 +427,11 @@ namespace Project
         {
             foreach(KeyValuePair<String, Proposal> entry in proposals)
             {
+
+                AbstractMeeting test;
+                this.Meetings.TryGetValue(entry.Key, out test);
+                if (test == null)
+                    this.AllMeetings[entry.Key] = entry.Value;
                 //Proposal que veio do servidor
                 Proposal p1 = entry.Value;
 
@@ -437,9 +450,12 @@ namespace Project
 
             foreach (KeyValuePair<string, LocationMeetings> entry in meetings)
             {
-                foreach (Meeting m1 in entry.Value.Meetings) { 
+                foreach (Meeting m1 in entry.Value.Meetings) {
 
-
+                    AbstractMeeting test;
+                    this.Meetings.TryGetValue(m1.Topic, out test);
+                    if (test == null)
+                        this.AllMeetings[entry.Key] = m1;
                     //Respetivo meeting no cliente
                     AbstractMeeting m2;
                     lock (this.Meetings)
@@ -457,6 +473,36 @@ namespace Project
             {
                 AbstractMeeting m = entry.Value;
                 Console.WriteLine(m.PrintInfo());
+            }
+        }
+
+        public void UpdateMeetingsFromClient()
+        {
+            Console.WriteLine("Entrei a meio da execucao");
+            foreach (KeyValuePair<String, AbstractMeeting> entry in this.AllMeetings)
+            {
+                /*AbstractMeeting test;
+                this.Meetings.TryGetValue(entry.Key, out test);
+                if (test == null)
+                    this.AllMeetings[entry.Key] = entry.Value;*/
+                
+                AbstractMeeting am1 = entry.Value;
+
+                lock (this.Meetings)
+                {
+                    AbstractMeeting test;
+                    this.Meetings.TryGetValue(entry.Key, out test);
+                    if (test == null && am1.N_invitees == 0)
+                    {
+                        this.Meetings[am1.Topic] = am1;
+                        Console.WriteLine("Esta meeting e aberta. Passei a conhece-la");
+                    }
+                    else if (test == null && am1.N_invitees != 0 && am1.Invitees.Contains(this.UserName))
+                    {
+                        this.Meetings[am1.Topic] = am1;
+                        Console.WriteLine("Esta meeting e fechada e sou convidado.");
+                    }
+                }
             }
         }
 
@@ -498,6 +544,19 @@ namespace Project
                 KnownServers.Add(url);
                 Console.WriteLine("Ja conheco o servidor " + url);
             }
+        }
+
+        public void AskNeighbourForMeetings(String clientName, String clientURL)
+        {
+            ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), clientURL);
+            Dictionary<String, AbstractMeeting> meetings = chosenClient.getAllMeetings();
+            this.AllMeetings = meetings;
+            this.UpdateMeetingsFromClient();
+        }
+
+        public Dictionary<String,AbstractMeeting> getAllMeetings()
+        {
+            return this.AllMeetings;
         }
     }
 }

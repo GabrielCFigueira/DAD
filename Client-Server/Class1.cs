@@ -31,6 +31,10 @@ namespace Project
 
         void getServers(Dictionary<String, int> Servers);
 
+        void AskNeighbourForMeetings(String clientName, String clientURL);
+
+        Dictionary<String, AbstractMeeting> getAllMeetings();
+
     }
 
     public interface ServerInterface

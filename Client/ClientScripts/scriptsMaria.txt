@@ -1,4 +1,4 @@
-create Pokemon 1 1 0 Lisboa,15-05-19
+create Pokemon 1 1 1 Lisboa,15-05-19 Joao
 create TouFarto 1 1 0 Lisboa,15-05-19
 create BomDia 1 1 0 Lisboa,15-05-19
 join Pokemon 1 Lisboa,15-05-19
