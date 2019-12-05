@@ -39,13 +39,13 @@ namespace Project
 
         void UpdateMeeting(Command command, string originalSender, string serverURL, Dictionary<string, int> vectorClock);
 
-        void UpdateClose(Command command, string topic, string serverURL, Dictionary<string, int> vectorClock);
+        void UpdateClose(Command command, string topic, string senderUrl, string serverURL, Dictionary<string, int> vectorClock);
 
         void UpdateClient(String client_url, String userName, string serverURL);
 
         int GetTicket(string topic, string serverURL, Dictionary<string, int> vectorClock);
 
-        void ReceiveTicketResult(string topic, string serverURL, int ticket, AbstractMeeting am, Dictionary<string, int> vectorClock);
+        void ReceiveTicketResult(string topic, string originalSender, string serverURL, int ticket, AbstractMeeting am, Dictionary<string, int> vectorClock);
 
     }
 

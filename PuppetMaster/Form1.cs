@@ -376,7 +376,7 @@ namespace PuppetMaster
         }
         
         public void Status()
-        {
+        { //FIXME locks?
             foreach (string serverID in serverDict.Keys)
             {
                 IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), serverDict[serverID].AbsoluteUri);
