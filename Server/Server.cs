@@ -626,7 +626,7 @@ namespace Project
             }
         }
 
-        public void RemoveCrashedServer(String server_url)
+        /*public void RemoveCrashedServer(String server_url)
         {
             this.Available_Servers.Remove(server_url);
             foreach (String url in this.Available_Servers)
@@ -637,7 +637,7 @@ namespace Project
                     si.RemoveAvailableServer(server_url);
                 }
             }
-        }
+        }*/
 
         public void RemoveAvailableServer(String server_url)
         {
@@ -646,8 +646,8 @@ namespace Project
 
         public void UpdateServersClients(String clientUrl, String userName)
         {
-            lock (this.Available_Servers)
-            {
+            //lock (this.Available_Servers)
+            //{
 
                 Thread[] pool = new Thread[this.Available_Servers.Count - 1];
                 int i = 0;
@@ -661,7 +661,7 @@ namespace Project
                         i++;
                     }
                 }
-            }
+            //}
         }
 
         private void DoUpdateClient(string serverUrl, string clientUrl, string userName)
