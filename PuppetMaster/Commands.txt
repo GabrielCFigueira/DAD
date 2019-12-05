@@ -1,7 +1,9 @@
-Server 1 tcp://localhost:8081/MeetingServer 0 2 50
-Server 2 tcp://localhost:8082/MeetingServer 0 2 50
+Server s1 tcp://localhost:3001/server1 0 0 0
+Server s2 tcp://localhost:3002/server2 0 2000 2000
+Server s3 tcp://localhost:3003/server3 0 0 0
 Wait 5000
-Client Maria tcp://localhost:8101/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsMaria.txt
-Client Ze tcp://localhost:8102/MeetingClient tcp://localhost:8082/MeetingServer ..\..\..\Client\ClientScripts\scriptsZe.txt
-Wait 30000
-Client Joao tcp://localhost:8103/MeetingClient tcp://localhost:8082/MeetingServer ..\..\..\Client\ClientScripts\scriptsJoao.txt
+AddRoom Lisboa 2 room1
+AddRoom Porto 2 room2
+Client c1 tcp://localhost:4001/client1 tcp://localhost:3001/server1 ../../../Client/ClientScripts/cs1.txt
+Client c2 tcp://localhost:4002/client2 tcp://localhost:3002/server2 ../../../Client/ClientScripts/cs2.txt
+Client c3 tcp://localhost:4003/client3 tcp://localhost:3003/server3 ../../../Client/ClientScripts/cs3.txt

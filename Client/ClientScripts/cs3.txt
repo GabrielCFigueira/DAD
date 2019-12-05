@@ -1,0 +1,2 @@
+join myTopic2 1 Porto,2020-01-10
+list

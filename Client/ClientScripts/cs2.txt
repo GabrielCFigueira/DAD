@@ -1,0 +1,3 @@
+join myTopic2 1 Porto,2020-01-10
+join myTopic1 1 Lisboa,2020-01-02
+list

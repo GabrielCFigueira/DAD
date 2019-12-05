@@ -33,15 +33,24 @@ namespace Project
             props["timeout"] = 3000; // in milliseconds
             TcpChannel channel = new TcpChannel(props, null, provider);
 
-            //TcpChannel channel = new TcpChannel(uri.Port);
-            ChannelServices.RegisterChannel(channel, false);
+            try
+            {
+                //TcpChannel channel = new TcpChannel(uri.Port);
+                ChannelServices.RegisterChannel(channel, false);
 
-            ServerImpl MeetingServer = new ServerImpl(id,url,maxFaults,minDelay,maxDelay, masterServer);
-            RemotingServices.Marshal(MeetingServer, uri.Segments[1], typeof(ServerImpl));
+                ServerImpl MeetingServer = new ServerImpl(id, url, maxFaults, minDelay, maxDelay, masterServer);
+                RemotingServices.Marshal(MeetingServer, uri.Segments[1], typeof(ServerImpl));
 
-            MeetingServer.InitializeLocationsAndRooms();
+                MeetingServer.InitializeLocationsAndRooms();
 
-            Console.ReadLine();
+                Console.ReadLine();
+            }
+            catch (Exception e) 
+            {
+                Console.WriteLine(e.StackTrace);
+                Console.WriteLine(e.Message);
+                Console.ReadLine();
+            }
         }
     }
 

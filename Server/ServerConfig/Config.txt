@@ -1,1 +1,2 @@
-Lisboa:1,Room A,50
+Lisboa:0
+Porto:0
