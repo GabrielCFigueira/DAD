@@ -550,27 +550,27 @@ namespace Project
             file.Close();
         }
 
-        public void PropagateClose(Command command, string topic)
+        public void PropagateClose(Command command, string topic, string senderURL, Dictionary<string, int> clock)
         {
             Thread[] pool = new Thread[this.Servers.Count - 1];
             int i = 0;
-            Dictionary<string, int> vectorClock = new Dictionary<string, int>(this.Servers);
+            Dictionary<string, int> vectorClock = new Dictionary<string, int>(clock);
             foreach (KeyValuePair<String, int> entry in this.Servers)
             {
                 if (this.url != entry.Key)
                 {
                     string url = entry.Key;
-                    pool[i] = new Thread(() => DoPropagate(url, command, topic, vectorClock));
+                    pool[i] = new Thread(() => DoPropagate(url, senderURL, command, topic, vectorClock));
                     pool[i].Start();
                     i++;
                 }
             }
         }
 
-        private void DoPropagate(string url, Command command, string topic, Dictionary<string, int> vectorClock)
+        private void DoPropagate(string url, string senderURL, Command command, string topic, Dictionary<string, int> vectorClock)
         {
             ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-            si.UpdateClose(command, topic, this.url, vectorClock);
+            si.UpdateClose(command, topic, senderURL, this.url, vectorClock);
         }
 
         public void UpdateServers(Command command, string senderURL, Dictionary<string, int> clock)
@@ -663,10 +663,9 @@ namespace Project
             }
 
             //From this point message will be delivered
-            
+
             //For now it's like this
-            int f = 1;   //Number of fails
-            int x = f + 1;
+            int x = this.maxFaults;
             lock (acks)
             {
                 while (acks[id].Count < x)
@@ -722,8 +721,7 @@ namespace Project
             }
 
             //From this point message will be delivered
-            int f = 1; //Number of fails
-            int x = f + 1;
+            int x = this.maxFaults;
             lock (acks)
             {
                 while (acks[command_id].Count < x)
@@ -750,18 +748,63 @@ namespace Project
                 Console.WriteLine("join/create executed");
             }
         }
-        public void UpdateClose(Command command, string topic, string serverURL, Dictionary<string, int> vectorClock)
+        public void UpdateClose(Command command, string topic, string originalSender, string serverURL, Dictionary<string, int> vectorClock)
         {
-            //FIXME add RB
+            //Implement Reliable_Broadcast_Servers
+            //if command is in acks
+            string command_id = command.getCommandId();
+            lock (acks)
+            {
+                if (acks.ContainsKey(command_id))
+                {
+                    //adds server to the acks of the message
+                    acks[command_id].Add(serverURL);
+                }
+                else
+                {
+                    acks.Add(command_id, new List<string>());
+                    acks[command_id].Add(serverURL);
+                }
+                Monitor.PulseAll(acks);  //Wake every spleeping thread that are waiting for acks
+            }
+
+            lock (received_commands)
+            {
+                //If not command received broadcast to everyone
+                if (!received_commands.Contains(command_id))
+                {
+                    received_commands.Add(command_id);
+                    PropagateClose(command, topic, originalSender, vectorClock);
+                }
+                else
+                {
+                    return;
+                }
+            }
+            //From this point message will be delivered
+            //Number of fails
+            int x = this.maxFaults;
+            lock (acks)
+            {
+                while (acks[command_id].Count < x)
+
+                {
+                    Monitor.Wait(acks);
+                }
+                Monitor.PulseAll(acks);
+            }
+
+
+
             lock (this.Servers)
             {
-                printClocks(serverURL, vectorClock, this.Servers);
-                while (!checkClock(serverURL, vectorClock))
+                printClocks(originalSender, vectorClock, this.Servers);
+                while (!checkClock(originalSender, vectorClock))
                 {
                     Monitor.Wait(this.Servers);
                 }
                 Console.Write("LEFT WHILE");
-                printClocks(serverURL, vectorClock, this.Servers);
+                printClocks(originalSender, vectorClock, this.Servers);
 
                 this.Servers[serverURL]++;
 
@@ -967,7 +1010,7 @@ namespace Project
             }
         }
 
-        private void PropagateTicket(int ticket, string topic, AbstractMeeting am, Dictionary<string, int> vectorClock)
+        private void PropagateTicket(int ticket, string topic, string originalSender, AbstractMeeting am, Dictionary<string, int> vectorClock)
         {
             lock (this.Servers)
             {
@@ -978,7 +1021,7 @@ namespace Project
                     if (this.url != entry.Key)
                     {
                         string url = entry.Key;
-                        pool[i] = new Thread(() => DoPropagateTicket(url, ticket, topic, am, vectorClock));
+                        pool[i] = new Thread(() => DoPropagateTicket(url, originalSender, ticket, topic, am, vectorClock));
                         pool[i].Start();
                         i++;
                     }
@@ -987,25 +1030,69 @@ namespace Project
             }
         }
 
-        private void DoPropagateTicket(string url, int ticket, string topic, AbstractMeeting am, Dictionary<string, int> vectorClock)
+        private void DoPropagateTicket(string url, string originalSender, int ticket, string topic, AbstractMeeting am, Dictionary<string, int> vectorClock)
         {
             ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-            si.ReceiveTicketResult(topic, this.url, ticket, am, vectorClock);
+            si.ReceiveTicketResult(topic, originalSender, this.url, ticket, am, vectorClock);
         }
 
-        public void ReceiveTicketResult(string topic, string serverURL, int ticket, AbstractMeeting am, Dictionary<string, int> vectorClock)
+        public void ReceiveTicketResult(string topic, string originalSender, string serverURL, int ticket, AbstractMeeting am, Dictionary<string, int> vectorClock)
         {
+            //Reliable_BroadCast
+            string msg_id = topic + ticket;
+            lock (acks)
+            {
+                if (acks.ContainsKey(msg_id))
+                {
+                    //adds server to the acks of the message
+                    acks[msg_id].Add(serverURL);
+                }
+                else
+                {
+                    acks.Add(msg_id, new List<string>());
+                    acks[msg_id].Add(serverURL);
+                }
+                Monitor.PulseAll(acks);  //Wake every spleeping thread that are waiting for acks
+            }
+
+            lock (received_commands)
+            {
+                //If not command received broadcast to everyone
+                if (!received_commands.Contains(msg_id))
+                {
+                    received_commands.Add(msg_id);
+                    PropagateTicket(ticket, topic, originalSender, am, vectorClock);
+                }
+                else
+                {
+                    return;
+                }
+            }
+
+            //From this point message will be delivered
+            //Number of fails
+            int x = this.maxFaults;
+            lock (acks)
+            {
+                while (acks[msg_id].Count < x)
+                {
+                    Monitor.Wait(acks);
+                }
+                Monitor.PulseAll(acks);
+            }
+
+
             Console.WriteLine(topic + "achtung!1");
             Dictionary<string, Command> pendingJoins = new Dictionary<string, Command>();
             lock (this.Servers)
             {
-                printClocks(serverURL, vectorClock, this.Servers);
-                while (!checkClock(serverURL, vectorClock))
+                printClocks(originalSender, vectorClock, this.Servers);
+                while (!checkClock(originalSender, vectorClock))
                 {
                     Monitor.Wait(this.Servers);
                 }
                 Console.Write("LEFT WHILE");
-                printClocks(serverURL, vectorClock, this.Servers);
+                printClocks(originalSender, vectorClock, this.Servers);
 
 
                 this.Servers[serverURL]++;
@@ -1137,7 +1224,7 @@ namespace Project
                     this.Closes.Add(topic, command);
                 
                     this.Servers[this.url]++;
-                    PropagateClose(command, topic);
+                    PropagateClose(command, topic, this.url, this.Servers);
                     this.Servers[this.url]++;
                     if (masterServer == this.url)
                     {
@@ -1186,12 +1273,7 @@ namespace Project
 
 
 
-            //Before updateServers (reliable broadcast)
-            string command_id = command.getCommandId();
-            lock (received_commands) //Adding my message to my received_commands
-            {
-                received_commands.Add(command_id);
-            }
+            
             AbstractMeeting am = command.Execute(this);
             lock (this.Closes)
             {
@@ -1203,7 +1285,14 @@ namespace Project
                 }
             }
 
-            PropagateTicket(newTicket, topic, am, vectorClock);
+            //Before updateServers (reliable broadcast)
+            string msg_id = topic + ticket;
+            lock (received_commands) //Adding my message to my received_commands
+            {
+                received_commands.Add(msg_id);
+            }
+
+            PropagateTicket(newTicket, topic, this.url, am, vectorClock);
             
         }
 
