@@ -26,6 +26,7 @@ namespace PuppetMaster
 
         public PuppetMaster()
         {
+            RemotingConfiguration.Configure("..\\..\\App.config", true);
             InitializeComponent();
             TcpChannel channel = new TcpChannel(10001);
             ChannelServices.RegisterChannel(channel, false);

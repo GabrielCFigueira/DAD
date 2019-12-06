@@ -19,6 +19,7 @@ namespace PCS
     {
         static void Main(string[] args)
         {
+            RemotingConfiguration.Configure("..\\..\\App.config", true);
             TcpChannel channel = new TcpChannel(10000);
             ChannelServices.RegisterChannel(channel, false);
             PCSImpl pcs = new PCSImpl();

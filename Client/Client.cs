@@ -20,6 +20,7 @@ namespace Project
         {
             try
             {
+                RemotingConfiguration.Configure("..\\..\\App.config", true);
                 String userName = args[1];
                 String clientUrl = args[2];
                 String serverUrl = args[3];
@@ -399,7 +400,7 @@ namespace Project
             AbstractMeeting am = (AbstractMeeting)p;
 
 
-            AbstractMeeting test;
+            AbstractMeeting test = null;
             this.AllMeetings.TryGetValue(am.Topic, out test);
             if (test == null)
                 this.AllMeetings[am.Topic] = am;

@@ -16,6 +16,7 @@ namespace Project
     {
         static void Main(string[] args)
         {
+            RemotingConfiguration.Configure("..\\..\\App.config", true);
             string id = args[1];
             String url = args[2];
             int maxFaults = Int32.Parse(args[3]);
@@ -872,6 +873,10 @@ namespace Project
                     Monitor.PulseAll(tickets);
                 }
 
+                lock (tickets)
+                {
+                    tickets[this.myURL] = this.lastTicket;
+                }
 
                 if (masterServer == serverUrl)
                 {
@@ -1653,6 +1658,12 @@ namespace Project
                                 tickets.Remove(masterServer);
                                 Monitor.PulseAll(tickets);
                             }
+
+                            lock (tickets)
+                            {
+                                tickets[this.myURL] = this.lastTicket;
+                            }
+
                             Thread thread = new Thread(() => leader_election("LE", lastTicket, this.myURL, this.myURL, masterServer));
                             thread.Start();
                             Monitor.PulseAll(this.MyVectorClock);
