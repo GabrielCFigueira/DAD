@@ -674,7 +674,7 @@ namespace Project
                 int i = 0;
                 for(i = 1; i < this.Available_Servers.Count; i++)
                 {
-                    if (this.myURL != this.Available_Servers[i])
+                    if (this.myURL != this.Available_Servers[i] && this.Available_Servers[i] != "failed")
                     {
                         string url = this.Available_Servers[i];
                         pool[i - 1] = new Thread(() => DoPropagate(url, senderURL, command, topic, vectorClock));
@@ -696,7 +696,8 @@ namespace Project
                 Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo");
                 lock (this.Available_Servers) //is this the fix??
                 {
-                    this.Available_Servers.Remove(url);
+                    this.WriteFailed(url);
+                    //this.Available_Servers.Remove(url);
                 }
             }
         }
@@ -713,7 +714,7 @@ namespace Project
                 }*/
                 for(i = 1; i < this.Available_Servers.Count; i++)
                 {
-                    if (this.myURL != this.Available_Servers[i])
+                    if (this.myURL != this.Available_Servers[i] && this.Available_Servers[i] != "failed")
                     {
                         string url = this.Available_Servers[i];
                         pool[i - 1] = new Thread(() => DoUpdate(url, senderURL, command, vectorClock));
@@ -735,7 +736,8 @@ namespace Project
                 Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo");
                 lock (this.Available_Servers) //is this the fix??
                 {
-                    this.Available_Servers.Remove(url);
+                    this.WriteFailed(url);
+                    //this.Available_Servers.Remove(url);
                 }
             }
         }
@@ -751,7 +753,7 @@ namespace Project
                 int i = 0;
                 for(i = 0; i <this.Available_Servers.Count; i++)
                 {
-                    if(this.Available_Servers[i] != this.myURL)
+                    if(this.Available_Servers[i] != this.myURL && this.Available_Servers[i] != "failed")
                     {
                         string url = this.Available_Servers[i];
                         pool[i - 1] = new Thread(() => DoUpdateClient(url, clientUrl, userName));
@@ -775,7 +777,8 @@ namespace Project
                 Console.WriteLine("O servidor " + serverUrl + " crashou.Vou remove-lo");
                 lock (this.Available_Servers) //is this the fix??
                 {
-                    this.Available_Servers.Remove(this.myURL);
+                    this.WriteFailed(serverUrl);
+                    //this.Available_Servers.Remove(this.myURL);
                 }
             }
         }
@@ -1038,7 +1041,8 @@ namespace Project
                 {
                     foreach (string serverURL in this.Available_Servers)
                     {
-                        Console.WriteLine("Server: " + serverURL);
+                        if(serverURL != "failed")
+                            Console.WriteLine("Server: " + serverURL);
                     }
                 }
                 else { Console.WriteLine("No Servers Available"); }
@@ -1188,7 +1192,7 @@ namespace Project
                 int i = 0;
                 for(i = 1; i < this.Available_Servers.Count; i++)
                 {
-                    if (this.myURL != this.Available_Servers[i])
+                    if (this.myURL != this.Available_Servers[i] && this.Available_Servers[i] != "failed")
                     {
                         string url = this.Available_Servers[i];
                         pool[i - 1] = new Thread(() => DoPropagateTicket(url, originalSender, ticket, topic, am, vectorClock));
@@ -1211,7 +1215,8 @@ namespace Project
                 Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo");
                 lock (this.Available_Servers) //is this the fix??
                 {
-                    this.Available_Servers.Remove(url);
+                    this.WriteFailed(url);
+                    //this.Available_Servers.Remove(url);
                 }
             }
         }
@@ -1379,6 +1384,15 @@ namespace Project
                 }
             }
             return false;
+        }
+
+        public void WriteFailed(String url)
+        {
+            for (int i = 0; i < this.Available_Servers.Count; i++)
+            {
+                if (this.Available_Servers[i] == url)
+                    this.Available_Servers[i] = "failed";
+            }
         }
 
         private void ExecuteTicket(Command command, string userName)

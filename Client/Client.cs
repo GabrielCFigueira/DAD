@@ -400,9 +400,9 @@ namespace Project
 
 
             AbstractMeeting test;
-            this.Meetings.TryGetValue(am.Topic, out test);
+            this.AllMeetings.TryGetValue(am.Topic, out test);
             if (test == null)
-                this.AllMeetings[p.Topic] = p;
+                this.AllMeetings[am.Topic] = am;
 
             lock (this.Meetings)
             {
@@ -434,7 +434,7 @@ namespace Project
                 {
                     String name = clientsToSendNameList[i];
                     String url = clientsToSendURLList[i];
-                    pool[i] = new Thread(() => DoSpreadMessage(p, actualRound, totalRounds, numberOfMessages, name, url));
+                    pool[i] = new Thread(() => DoSpreadMessage(p, actualRound, totalRounds, numberOfMessages, url));
                     pool[i].Start();
                 }
             } else
@@ -444,13 +444,13 @@ namespace Project
                 {
                     String name = clientsToSendNameList[i];
                     String url = clientsToSendURLList[i];
-                    pool[i] = new Thread(() => DoSpreadMessage(p, actualRound, totalRounds, numberOfMessages, name, url));
+                    pool[i] = new Thread(() => DoSpreadMessage(p, actualRound, totalRounds, numberOfMessages, url));
                     pool[i].Start();
                 }
             }
         }
 
-        public void DoSpreadMessage(Proposal p, int actualRound, int totalRounds, int numberOfMessages, String clientToSendName, String clientToSendURL)
+        public void DoSpreadMessage(Proposal p, int actualRound, int totalRounds, int numberOfMessages, String clientToSendURL)
         {
             Console.WriteLine("Mandei ao/a " + clientToSendURL);
             ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), clientToSendURL);
