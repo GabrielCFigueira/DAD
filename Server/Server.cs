@@ -867,6 +867,10 @@ namespace Project
                     Monitor.PulseAll(tickets);
                 }
 
+                lock (tickets)
+                {
+                    tickets[this.myURL] = this.lastTicket;
+                }
 
                 if (masterServer == serverUrl)
                 {
@@ -1637,6 +1641,11 @@ namespace Project
                             {
                                 tickets.Remove(masterServer);
                                 Monitor.PulseAll(tickets);
+                            }
+
+                            lock (tickets)
+                            {
+                                tickets[this.myURL] = this.lastTicket;
                             }
 
                             leader_election("LE", lastTicket, this.myURL, this.myURL, masterServer); //isto e async
