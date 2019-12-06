@@ -1,11 +1,26 @@
-Server s1 tcp://localhost:3001/server1 2 0 0
-Server s2 tcp://localhost:3002/server2 2 0 0
-Server s3 tcp://localhost:3003/server3 2 0 0
-Server s4 tcp://localhost:3004/server4 2 0 0
-Server s5 tcp://localhost:3005/server5 2 0 0
-Wait 10000
-AddRoom Lisboa 2 room1
-AddRoom Porto 2 room2
-Client c1 tcp://localhost:4001/client1 tcp://localhost:3002/server2 ../../../Client/ClientScripts/cs1.txt
-Client c2 tcp://localhost:4002/client2 tcp://localhost:3001/server1 ../../../Client/ClientScripts/cs2.txt
-Client c3 tcp://localhost:4003/client3 tcp://localhost:3003/server3 ../../../Client/ClientScripts/cs3.txt
+Server 1 tcp://localhost:8081/MeetingServer 1 2 50
+Server 2 tcp://localhost:8082/MeetingServer 1 2 50
+Server 3 tcp://localhost:8083/MeetingServer 1 2 50
+Server 4 tcp://localhost:8084/MeetingServer 1 2 50
+Server 5 tcp://localhost:8085/MeetingServer 1 2 50
+Wait 20000
+Client Maria tcp://localhost:8100/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsMaria.txt
+Client Joao tcp://localhost:8101/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsJoao.txt
+Client Ze tcp://localhost:8102/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsZe.txt
+Client Pedro tcp://localhost:8103/MeetingClient tcp://localhost:8081/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Andre tcp://localhost:8104/MeetingClient tcp://localhost:8082/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Julia tcp://localhost:8105/MeetingClient tcp://localhost:8082/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Yolanda tcp://localhost:8106/MeetingClient tcp://localhost:8082/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Catarina tcp://localhost:8107/MeetingClient tcp://localhost:8082/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Henrique tcp://localhost:8108/MeetingClient tcp://localhost:8083/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Tiago tcp://localhost:8109/MeetingClient tcp://localhost:8083/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Alexandre tcp://localhost:8110/MeetingClient tcp://localhost:8083/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Mauro tcp://localhost:8111/MeetingClient tcp://localhost:8083/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Fernando tcp://localhost:8112/MeetingClient tcp://localhost:8084/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Livio tcp://localhost:8113/MeetingClient tcp://localhost:8084/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Laura tcp://localhost:8114/MeetingClient tcp://localhost:8084/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Mariana tcp://localhost:8115/MeetingClient tcp://localhost:8084/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Henriqueta tcp://localhost:8116/MeetingClient tcp://localhost:8085/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Gertrudes tcp://localhost:8117/MeetingClient tcp://localhost:8085/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Humberto tcp://localhost:8118/MeetingClient tcp://localhost:8085/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt
+Client Bonifacio tcp://localhost:8119/MeetingClient tcp://localhost:8085/MeetingServer ..\..\..\Client\ClientScripts\scriptsPedro.txt

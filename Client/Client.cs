@@ -30,7 +30,7 @@ namespace Project
                 BinaryServerFormatterSinkProvider provider = new BinaryServerFormatterSinkProvider();
                 IDictionary props = new Hashtable();
                 props["port"] = clientUri.Port;
-                props["timeout"] = 5000; // in milliseconds
+                //props["timeout"] = 10000; // in milliseconds
                 TcpChannel channel = new TcpChannel(props, null, provider);
 
                 //TcpChannel channel = new TcpChannel(clientUri.Port);
@@ -361,20 +361,39 @@ namespace Project
 
         public void Gossip(Proposal p, int actualRound, int totalRounds, int numberOfMessages)
         {
-            this.ClientsSent = new Dictionary<String, String>();
+            Dictionary<String, String> clientsToSend = new Dictionary<String, String>();
+            String actualServerUrl = this.Server_url;
             Console.WriteLine("Comecei o Gossip");
-            foreach (KeyValuePair<String, String> entry in this.Clients)
-            {
-                Console.WriteLine(entry.Value);
-            }
-
-            Console.WriteLine("Actual Round: " + actualRound);
-            Console.WriteLine("Total rounds: " + totalRounds);
 
             if (actualRound > totalRounds)
             {
                 Console.WriteLine("Acabou o gossip");
                 return;
+            }
+
+            while (true)
+            {
+                try
+                {
+                    ServerInterface s = this.Server;
+                    clientsToSend = s.GetListOfRandomClients((totalRounds - actualRound + 1) * numberOfMessages, this.UserName);
+                    break;
+                }
+                catch (SocketException e)
+                {
+                    lock (this.Server)
+                    {
+                        lock (this.Server_url)
+                        {
+                            if (actualServerUrl == this.Server_url)
+                            {
+                                Console.WriteLine(e.Message);
+                                this.Server_url = GetNextAvailableServer();
+                                this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                            }
+                        }
+                    }
+                }
             }
 
             AbstractMeeting am = (AbstractMeeting)p;
@@ -401,84 +420,41 @@ namespace Project
                 }
             }
 
+            Console.WriteLine("Actual Round: " + actualRound);
+            Console.WriteLine("Total rounds: " + totalRounds);
             Console.WriteLine("Vou mandar " + numberOfMessages + " mensagens");
-            Thread[] pool = new Thread[numberOfMessages];
-            for (int i = 0; i < numberOfMessages; i++)
+            Thread[] pool;
+
+            List<String> clientsToSendURLList = clientsToSend.Values.ToList();
+            List<String> clientsToSendNameList = clientsToSend.Keys.ToList();
+            if (clientsToSend.Count > numberOfMessages)
             {
-                pool[i] = new Thread(() => DoSpreadMessage(p, actualRound, totalRounds, numberOfMessages));
-                pool[i].Start();
+                pool = new Thread[numberOfMessages];
+                for (int i = 0; i < numberOfMessages; i++)
+                {
+                    String name = clientsToSendNameList[i];
+                    String url = clientsToSendURLList[i];
+                    pool[i] = new Thread(() => DoSpreadMessage(p, actualRound, totalRounds, numberOfMessages, name, url));
+                    pool[i].Start();
+                }
+            } else
+            {
+                pool = new Thread[clientsToSend.Count];
+                for (int i = 0; i < clientsToSend.Count; i++)
+                {
+                    String name = clientsToSendNameList[i];
+                    String url = clientsToSendURLList[i];
+                    pool[i] = new Thread(() => DoSpreadMessage(p, actualRound, totalRounds, numberOfMessages, name, url));
+                    pool[i].Start();
+                }
             }
         }
 
-        public void DoSpreadMessage(Proposal p, int actualRound, int totalRounds, int numberOfMessages)
+        public void DoSpreadMessage(Proposal p, int actualRound, int totalRounds, int numberOfMessages, String clientToSendName, String clientToSendURL)
         {
-            //lock (this.Server)
-            //{
-            //lock (this.Server_url)
-            //{
-            String actualServerUrl = this.Server_url;
-            ServerInterface s = this.Server;
-            String chosenClientName;
-            String chosenClientURL;
-
-            while (true)
-            {
-                try
-                {
-                    (chosenClientName, chosenClientURL) = s.getRandomClientName();
-                    break;
-                }
-                catch (SocketException e)
-                {
-                    lock (this.Server)
-                    {
-                        lock (this.Server_url)
-                        {
-                            if (actualServerUrl == this.Server_url)
-                            {
-                                Console.WriteLine(e.Message);
-                                this.Server_url = GetNextAvailableServer();
-                                this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
-                            }
-                            //(chosenClientName, chosenClientURL) = this.Server.getRandomClientName();
-                        }
-                    }
-                }
-            }
-            lock (this.ClientsSent)
-            {
-                while (chosenClientName == this.UserName || this.ClientsSent.ContainsKey(chosenClientName))
-                {
-                    try
-                    {
-                        (chosenClientName, chosenClientURL) = s.getRandomClientName();
-                    }
-                    catch (SocketException)
-                    {
-                        lock (this.Server)
-                        {
-                            lock (this.Server_url)
-                            {
-                                if (actualServerUrl == this.Server_url)
-                                {
-                                    Console.WriteLine("O SERVIDOR " + this.Server_url + " CRASHOU");
-                                    this.Server_url = GetNextAvailableServer();
-                                    this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
-                                }
-                                (chosenClientName, chosenClientURL) = this.Server.getRandomClientName();
-                            }
-                        }
-                    }
-                }
-
-                this.ClientsSent.Add(chosenClientName, chosenClientURL);
-            }
-
-            Console.WriteLine("Mandei ao/a " + chosenClientURL);
-            ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), chosenClientURL);
+            Console.WriteLine("Mandei ao/a " + clientToSendURL);
+            ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), clientToSendURL);
             chosenClient.Gossip(p, actualRound + 1, totalRounds, numberOfMessages);
-                //}
-            //}
         }
 
         public void UpdateMeetings(Dictionary<string, Proposal> proposals, Dictionary<string, LocationMeetings> meetings)

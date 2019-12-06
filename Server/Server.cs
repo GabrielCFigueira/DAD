@@ -475,7 +475,7 @@ namespace Project
                 totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2));
             else
                 totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, numberOfMessages));
-            totalRounds += 2; //this is for gossip
+            totalRounds += 3; //this is for gossip
             //c.AddProposal(p);
             c.Gossip(p,1,totalRounds,numberOfMessages);
             
@@ -598,6 +598,41 @@ namespace Project
                 String chosenClientName = listClientNames[randomIndex];
                 return (chosenClientName, this.ClientsURLS[chosenClientName]);
             }
+        }
+
+        public Dictionary<String, String> GetListOfRandomClients(int numberOfClients, String userName)
+        {
+            Dictionary<String, String> clients =  new Dictionary<String, String>();
+            if(numberOfClients < this.Clients.Count - 1)
+            {
+                for(int i = 0; i < numberOfClients; i++)
+                {
+                    (String clientName,String clientURL) = this.getRandomClientName();
+                    String test;
+                    clients.TryGetValue(clientName, out test);
+                    while (clientName == userName || test != null)
+                    {
+                        (clientName, clientURL) = this.getRandomClientName();
+                        clients.TryGetValue(clientName, out test);
+                    }
+                    clients[clientName] = clientURL;
+                }
+            }
+            else
+            {
+                //clients = this.ClientsURLS;
+                foreach(KeyValuePair<String,String> entry in this.ClientsURLS)
+                {
+                    if(entry.Key != userName)
+                        clients[entry.Key] = entry.Value;
+                }
+            }
+
+            foreach(KeyValuePair<String,String> entry in clients)
+            {
+                Console.WriteLine("Vou-te dar este cliente: " + entry.Key);
+            }
+            return clients;
         }
 
         public void InitializeLocationsAndRooms()

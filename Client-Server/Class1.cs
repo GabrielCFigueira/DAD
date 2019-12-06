@@ -61,6 +61,8 @@ namespace Project
 
         (String,String) getRandomClientName();
 
+        Dictionary<String, String> GetListOfRandomClients(int numberOfClients, String userName);
+
     }
 
     [Serializable]
