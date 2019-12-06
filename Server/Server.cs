@@ -481,6 +481,7 @@ namespace Project
             {
                 received_commands.Add(command.getCommandId());
             }
+            Console.WriteLine("Saí do received_commands");
 
             Dictionary<string, int> clock = new Dictionary<string, int>(this.MyVectorClock);
             UpdateServers(command, this.myURL, clock);
@@ -607,11 +608,14 @@ namespace Project
 
         public (String,String) getRandomClientName()
         {
-            List<String> listClientNames = this.ClientsURLS.Keys.ToList();
-            Random random = new Random();
-            int randomIndex = random.Next(listClientNames.Count);
-            String chosenClientName = listClientNames[randomIndex];
-            return (chosenClientName,this.ClientsURLS[chosenClientName]);
+            lock (this.ClientsURLS)
+            {
+                List<String> listClientNames = this.ClientsURLS.Keys.ToList();
+                Random random = new Random();
+                int randomIndex = random.Next(listClientNames.Count);
+                String chosenClientName = listClientNames[randomIndex];
+                return (chosenClientName, this.ClientsURLS[chosenClientName]);
+            }
         }
 
         public void InitializeLocationsAndRooms()
@@ -656,14 +660,13 @@ namespace Project
             {
                 Thread[] pool = new Thread[this.Available_Servers.Count - 1];
                 int i = 0;
-                foreach (string serverURL in this.Available_Servers)
+                for(i = 1; i < this.Available_Servers.Count; i++)
                 {
-                    if (this.myURL != serverURL)
+                    if (this.myURL != this.Available_Servers[i])
                     {
-                        string url = serverURL;
-                        pool[i] = new Thread(() => DoPropagate(url, senderURL, command, topic, vectorClock));
-                        pool[i].Start();
-                        i++;
+                        string url = this.Available_Servers[i];
+                        pool[i - 1] = new Thread(() => DoPropagate(url, senderURL, command, topic, vectorClock));
+                        pool[i - 1].Start();
                     }
                 }
             }
@@ -671,8 +674,19 @@ namespace Project
 
         private void DoPropagate(string url, string senderURL, Command command, string topic, Dictionary<string, int> vectorClock)
         {
-            ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-            si.UpdateClose(command, topic, senderURL, this.myURL, vectorClock);
+            try
+            {
+                ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
+                si.UpdateClose(command, topic, senderURL, this.myURL, vectorClock);
+            }
+            catch (SocketException)
+            {
+                Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo");
+                lock (this.Available_Servers) //is this the fix??
+                {
+                    this.Available_Servers.Remove(url);
+                }
+            }
         }
 
         public void UpdateServers(Command command, string senderURL, Dictionary<string, int> vectorClock)
@@ -681,18 +695,17 @@ namespace Project
             {
                 Thread[] pool = new Thread[this.Available_Servers.Count - 1];
                 int i = 0;
-                if (senderURL == this.myURL) //FIXME hardcoded delay
+                /*if (senderURL == this.myURL) //FIXME hardcoded delay
                 {
                     this.waitBetweenRequests();
-                }
-                foreach (string serverURL in this.Available_Servers)
+                }*/
+                for(i = 1; i < this.Available_Servers.Count; i++)
                 {
-                    if (this.myURL != serverURL)
+                    if (this.myURL != this.Available_Servers[i])
                     {
-                        string url = serverURL;
-                        pool[i] = new Thread(() => DoUpdate(url, senderURL, command, vectorClock));
-                        pool[i].Start();
-                        i++;
+                        string url = this.Available_Servers[i];
+                        pool[i - 1] = new Thread(() => DoUpdate(url, senderURL, command, vectorClock));
+                        pool[i - 1].Start();
                     }
                 }
             }
@@ -722,19 +735,18 @@ namespace Project
             lock (this.Available_Servers) //FIXME
             {
 
-                Thread[] pool = new Thread[this.Available_Servers.Count - 1];
+                Thread[] pool = new Thread[this.Available_Servers.Count];
                 int i = 0;
-                foreach (String serverURL in this.Available_Servers)
+                for(i = 0; i <this.Available_Servers.Count; i++)
                 {
-                    if(serverURL != this.myURL)
+                    if(this.Available_Servers[i] != this.myURL)
                     {
-                        string url = serverURL;
-                        pool[i] = new Thread(() => DoUpdateClient(url, clientUrl, userName));
-                        pool[i].Start();
-                        i++;
+                        string url = this.Available_Servers[i];
+                        pool[i - 1] = new Thread(() => DoUpdateClient(url, clientUrl, userName));
+                        pool[i - 1].Start();
                     }
                 }
-                Monitor.PulseAll(Available_Servers);
+                //Monitor.PulseAll(Available_Servers);
             }
         }
 
@@ -847,7 +859,6 @@ namespace Project
                     return;
                 }
             }
-
             UpdateServers(command, originalSender, vectorClock);
 
             //From this point message will be delivered
@@ -1181,14 +1192,13 @@ namespace Project
             {
                 Thread[] pool = new Thread[this.Available_Servers.Count - 1];
                 int i = 0;
-                foreach (string serverURL in this.Available_Servers)
+                for(i = 1; i < this.Available_Servers.Count; i++)
                 {
-                    if (this.myURL != serverURL)
+                    if (this.myURL != this.Available_Servers[i])
                     {
-                        string url = serverURL;
-                        pool[i] = new Thread(() => DoPropagateTicket(url, originalSender, ticket, topic, am, vectorClock));
-                        pool[i].Start();
-                        i++;
+                        string url = this.Available_Servers[i];
+                        pool[i - 1] = new Thread(() => DoPropagateTicket(url, originalSender, ticket, topic, am, vectorClock));
+                        pool[i - 1].Start();
                     }
                 }
                 Monitor.PulseAll(this.Available_Servers);
@@ -1197,8 +1207,19 @@ namespace Project
 
         private void DoPropagateTicket(string url, string originalSender, int ticket, string topic, AbstractMeeting am, Dictionary<string, int> vectorClock)
         {
-            ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-            si.ReceiveTicketResult(topic, originalSender, this.myURL, ticket, am, vectorClock);
+            try
+            {
+                ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
+                si.ReceiveTicketResult(topic, originalSender, this.myURL, ticket, am, vectorClock);
+            }
+            catch (SocketException)
+            {
+                Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo");
+                lock (this.Available_Servers) //is this the fix??
+                {
+                    this.Available_Servers.Remove(url);
+                }
+            }
         }
 
         public void ReceiveTicketResult(string topic, string originalSender, string serverURL, int ticket, AbstractMeeting am, Dictionary<string, int> vectorClock)
