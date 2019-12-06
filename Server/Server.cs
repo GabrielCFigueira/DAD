@@ -16,6 +16,7 @@ namespace Project
     {
         static void Main(string[] args)
         {
+            RemotingConfiguration.Configure("..\\..\\App.config", true);
             string id = args[1];
             String url = args[2];
             int maxFaults = Int32.Parse(args[3]);
