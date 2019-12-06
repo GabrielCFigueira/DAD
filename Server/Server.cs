@@ -81,6 +81,10 @@ namespace Project
         Dictionary<string, List<string>> acks; //Key: depends on command, values: list of servers
         List<string> received_commands;
 
+        //Leader_Election
+        Dictionary<string, int> tickets; //string is serverURL, int is ticket of that server
+        string LE;
+
         //Freeze and Unfreeze variable
         bool freeze = false;
 
@@ -397,11 +401,16 @@ namespace Project
             this.PendingCommands = new Dictionary<string, Command>();
             this.Tickets = new Dictionary<string, Ticket>();
 
-            this.masterServer = masterServer;
+            this.masterServer = masterServer; //Leader_ID
 
             //Reliable_Broadcast
             this.acks = new Dictionary<string, List<string>>();
             this.received_commands = new List<string>();
+
+            //Leader_Election
+            this.tickets = new Dictionary<string, int>();
+            this.tickets.Add(url, 0);
+            this.LE = "";
 ;
         }
 
@@ -694,6 +703,13 @@ namespace Project
                 {
                     this.Available_Servers.Remove(url);
                 }
+
+                if(masterServer == url)
+                {
+                    //Start Leader_Election("LE", myTicket, myURL, myURL, urlcrashdo)
+                }
+
+
             }
         }
 
@@ -952,6 +968,10 @@ namespace Project
             {
                 lock (this.Available_Servers)
                 {
+                    lock (tickets)
+                    {
+                        this.tickets.Add(serverURL, 0);
+                    }
                     this.MyVectorClock.Add(serverURL, 0);
                     this.Available_Servers.Add(serverURL);
                     Monitor.PulseAll(this.MyVectorClock);
@@ -1410,6 +1430,157 @@ namespace Project
 
             PropagateTicket(newTicket, topic, this.myURL, am, vectorClock);
             
+        }
+
+
+        //
+        //                      L E A D E R   E L E C T I O N
+        //
+
+        /*
+         TODO:
+            1-  Acabar leader_election
+            2- Make Sure que estou a remover o que foi crashado
+            3- Bloquear tickets quando estou LE = "LE"
+            4- Chamar o leader election
+            5 - Depois de LE continuar o processo
+            6- Testar 
+        */
+
+        public void leader_election(string LE, int myTicket, string originalSender, string sender, string crashedServer)
+        {
+            //RB_Send, e depois o RB ha de chamar received_LE
+            //Add my message before broadcast
+            string msg_id = this.myURL + myTicket;
+            lock (received_commands)
+            {
+                received_commands.Add(msg_id);
+            }
+
+
+        }
+
+        public void received_LE(string LE, int received_ticket, string originalSender, string sender, string crashedServer)
+        {
+            
+            //Vou ver se ja recebi esta mensagem
+            string msg_id = originalSender + received_ticket;
+            lock (received_commands)
+            {
+                //If not command received broadcast to everyone
+                if (!received_commands.Contains(msg_id))
+                {
+                    received_commands.Add(msg_id);
+                }
+                else
+                {
+                    return;
+                }
+            }
+
+            //Update global LE
+            lock (LE) 
+            { 
+                this.LE = "LE"; 
+                Monitor.PulseAll(LE);
+            }
+
+            //Remove Crashed Server
+            lock (Available_Servers)
+            {
+                Available_Servers.Remove(crashedServer);
+            }
+            lock (tickets)
+            {
+                tickets.Remove(crashedServer);
+            }
+
+            lock (tickets) //Save the ticket from server p
+            {
+                tickets[originalSender] = received_ticket;
+                Monitor.PulseAll(tickets);  //Wake every spleeping thread that are waiting for acks
+            }
+            leader_election("LE", received_ticket, originalSender, sender, crashedServer); //RB da mensagem que acabei de receber
+
+            //RB do meu ticket
+            int myTicket = this.lastTicket;
+            leader_election("LE", myTicket, this.myURL, this.myURL, crashedServer);
+
+            lock (tickets)
+            {
+                while(notAllTickets())
+                {
+                    Monitor.Wait(tickets);
+                }
+                Monitor.PulseAll(tickets);
+            }
+            
+            //Decide leader
+            (string new_leader, int new_ticket) = decide_new_leader();
+            lock (masterServer)
+            {
+                this.masterServer = new_leader;
+            }
+            this.lastTicket = new_ticket;
+  
+            //Reset ticket
+            reset_ticket();
+
+
+            lock (LE)
+            {
+                this.LE = "DONE";
+                Monitor.PulseAll(LE);
+            }
+
+        }
+
+        public Boolean notAllTickets()
+        {
+            foreach (string s in tickets.Keys)
+            {
+                if (tickets[s] == 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public (string, int) decide_new_leader()
+        {
+            int temp_i = 0;
+            string temp_s = "";
+            lock(tickets)
+            {
+                foreach (string s in tickets.Keys)
+                {
+                    if(tickets[s] > temp_i)
+                    {
+                        temp_i = tickets[s];
+                    }
+                    else if(tickets[s] == temp_i)
+                    {
+                        if(string.Compare(temp_s, s, comparisonType: StringComparison.OrdinalIgnoreCase) < 0)
+                        {
+                            temp_s = s;
+                        }
+                    }
+                }
+            }
+            return (temp_s, temp_i);
+        }
+
+        public void reset_ticket()
+        {
+            lock (tickets)
+            {
+                foreach (string s in tickets.Keys)
+                {
+                    tickets[s] = 0;
+                }
+
+            }
         }
 
     }
