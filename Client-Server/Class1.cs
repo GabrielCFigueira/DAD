@@ -60,6 +60,7 @@ namespace Project
         void ReceiveTicketResult(string topic, string originalSender, string serverURL, int ticket, AbstractMeeting am, Dictionary<string, int> vectorClock);
 
         (String,String) getRandomClientName();
+        void received_LE(string LE, int ticket, string originalSender, string sender, string crashedServer);
 
     }
 

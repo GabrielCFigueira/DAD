@@ -30,7 +30,7 @@ namespace Project
 
             IDictionary props = new Hashtable();
             props["port"] = uri.Port;
-            props["timeout"] = 3000; // in milliseconds
+            props["timeout"] = 30000; // in milliseconds
             TcpChannel channel = new TcpChannel(props, null, provider);
 
             try
@@ -116,7 +116,7 @@ namespace Project
                 ServerImpl server = (ServerImpl)si;
                 lock (server.Proposals)
                 {
-                    if(server.Proposals.ContainsKey(this.Topic)) //idempotency
+                    if (server.Proposals.ContainsKey(this.Topic)) //idempotency
                     {
                         return server.Proposals[this.Topic];
                     }
@@ -150,12 +150,12 @@ namespace Project
             List<string> slots;
             Dictionary<string, int> vectorClock;
             string serverURL;
-            public DoJoin(string topic, string userName, List<string> slots, Dictionary<string,int> vectorClock, string serverURL)
+            public DoJoin(string topic, string userName, List<string> slots, Dictionary<string, int> vectorClock, string serverURL)
                 : base(topic)
             {
                 this.userName = userName;
                 this.slots = slots;
-                this.command_id = topic +  userName;
+                this.command_id = topic + userName;
                 this.vectorClock = new Dictionary<string, int>(vectorClock);
                 this.serverURL = serverURL;
             }
@@ -191,7 +191,7 @@ namespace Project
                         am = server.Proposals[this.Topic];
                     }
 
-                    label:
+                label:
                     List<Slot> Slots = new List<Slot>();
                     if ((am.N_invitees != 0 && am.Invitees.Contains(userName)) || am.N_invitees == 0 || am.Coordinator == userName)
                     {
@@ -200,15 +200,15 @@ namespace Project
                             string[] zone_date = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries); //zone_date[0] e um local, zone_date[1] e uma data
                             Location l = server.Meetings[zone_date[0]].Location;
                             Slot slot = new Slot(l, zone_date[1]);
-                            if(am.isProposal())
+                            if (am.isProposal())
                             {
-                                ((Proposal) am).Slots[s].Votes += 1;
+                                ((Proposal)am).Slots[s].Votes += 1;
                             }
                             Slots.Add(slot);
                         }
 
                         Attendee a = new Attendee(userName, Slots, vectorClock, serverURL);
-                        if(!am.isProposal())
+                        if (!am.isProposal())
                         {
                             a.LateArrival = true;
                         }
@@ -251,7 +251,7 @@ namespace Project
                     if (checkClock(b.ServerURL, b.VectorClock, a.VectorClock))
                         result--;
 
-                    if(result == 0)
+                    if (result == 0)
                     {
                         result = -string.Compare(a.Name, b.Name, comparisonType: StringComparison.OrdinalIgnoreCase);
                     }
@@ -337,13 +337,13 @@ namespace Project
                                 return p;
                             }
                             else
-                            { 
+                            {
                                 List<Attendee> attendees = new List<Attendee>();
-                                foreach(Attendee at in p.Attendees)
+                                foreach (Attendee at in p.Attendees)
                                 {
-                                    foreach(Slot s in at.Available_slots)
+                                    foreach (Slot s in at.Available_slots)
                                     {
-                                        if(s.Date == chosenSlot.Date && s.Location.Local == chosenSlot.Location.Local)
+                                        if (s.Date == chosenSlot.Date && s.Location.Local == chosenSlot.Location.Local)
                                         {
                                             attendees.Add(at);
                                             break;
@@ -409,9 +409,9 @@ namespace Project
 
             //Leader_Election
             this.tickets = new Dictionary<string, int>();
-            this.tickets.Add(url, 0);
+            this.tickets.Add(url, -1);
             this.LE = "";
-;
+            ;
         }
 
         public override object InitializeLifetimeService()
@@ -438,11 +438,11 @@ namespace Project
                 }
                 Monitor.PulseAll(this);
             }
-            
+
             Command command = new DoClose(userName, topic);
             ExecuteTicket(command, "");
-                   
-            
+
+
         }
 
         public void CreateProposal(String coordinator, String topic, int min_attendees, int n_slots, int n_invitees, List<String> slots, List<String> invitees)
@@ -467,7 +467,7 @@ namespace Project
                 this.MyVectorClock[this.myURL]++;
                 Monitor.PulseAll(this.MyVectorClock);
             }
-            
+
             lock (received_commands)
             {
                 received_commands.Add(command.getCommandId());
@@ -479,14 +479,14 @@ namespace Project
             Console.WriteLine("Tenho " + this.Clients.Count + " clientes");
             int numberOfMessages = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2));
             int totalRounds;
-            if(numberOfMessages == 1)
+            if (numberOfMessages == 1)
                 totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2));
             else
                 totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, numberOfMessages));
             totalRounds += 2; //this is for gossip
             //c.AddProposal(p);
-            c.Gossip(p,1,totalRounds,numberOfMessages);
-            
+            c.Gossip(p, 1, totalRounds, numberOfMessages);
+
         }
 
         public void JoinMeeting(String topic, String userName, List<String> slots)
@@ -565,13 +565,13 @@ namespace Project
             {
                 lock (this.ClientsURLS)
                 {
-                    if(this.Clients.Count != 0)
+                    if (this.Clients.Count != 0)
                     {
                         Console.WriteLine("Ja existem mais clientes. Vai pedir os meetings a um deles.");
                         String clientName;
                         String clientURL;
-                        (clientName,clientURL) = this.getRandomClientName();
-                        c.AskNeighbourForMeetings(clientName,clientURL);
+                        (clientName, clientURL) = this.getRandomClientName();
+                        c.AskNeighbourForMeetings(clientName, clientURL);
                     }
                     Clients.Add(userName, c);
                     ClientsURLS.Add(userName, client_URL);
@@ -596,13 +596,13 @@ namespace Project
 
         }
 
-        public (String,String) getRandomClientName()
+        public (String, String) getRandomClientName()
         {
             List<String> listClientNames = this.ClientsURLS.Keys.ToList();
             Random random = new Random();
             int randomIndex = random.Next(listClientNames.Count);
             String chosenClientName = listClientNames[randomIndex];
-            return (chosenClientName,this.ClientsURLS[chosenClientName]);
+            return (chosenClientName, this.ClientsURLS[chosenClientName]);
         }
 
         public void InitializeLocationsAndRooms()
@@ -662,8 +662,30 @@ namespace Project
 
         private void DoPropagate(string url, string senderURL, Command command, string topic, Dictionary<string, int> vectorClock)
         {
-            ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-            si.UpdateClose(command, topic, senderURL, this.myURL, vectorClock);
+            try
+            {
+                ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
+                si.UpdateClose(command, topic, senderURL, this.myURL, vectorClock);
+            }
+            catch
+            {
+                Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo");
+                lock (this.Available_Servers) //is this the fix??
+                {
+                    this.Available_Servers.Remove(url);
+                }
+
+                lock (tickets)
+                {
+                    tickets.Remove(url);
+                }
+
+                if (masterServer == url)
+                {
+                    //Start Leader_Election
+                    leader_election("LE", this.lastTicket, this.myURL, this.myURL, url); //url is from the masterPuppet
+                }
+            }
         }
 
         public void UpdateServers(Command command, string senderURL, Dictionary<string, int> vectorClock)
@@ -698,22 +720,27 @@ namespace Project
             }
             catch (SocketException)
             {
-                Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo");
+                Console.WriteLine("O servidor " + url + " crashou. Vou remove-lo");
                 lock (this.Available_Servers) //is this the fix??
                 {
                     this.Available_Servers.Remove(url);
                 }
 
-                if(masterServer == url)
+                lock (tickets)
                 {
-                    //Start Leader_Election("LE", myTicket, myURL, myURL, urlcrashdo)
+                    tickets.Remove(url);
                 }
 
-
+                if (masterServer == url)
+                {
+                    //Start Leader_Election
+                    Console.WriteLine("LEADER ELECTION!!!");
+                    leader_election("LE", this.lastTicket, this.myURL, this.myURL, url); //url is from the masterPuppet
+                }
             }
         }
 
-        
+
 
         public void UpdateServersClients(String clientUrl, String userName)
         {
@@ -724,7 +751,7 @@ namespace Project
                 int i = 0;
                 foreach (String serverURL in this.Available_Servers)
                 {
-                    if(serverURL != this.myURL)
+                    if (serverURL != this.myURL)
                     {
                         string url = serverURL;
                         pool[i] = new Thread(() => DoUpdateClient(url, clientUrl, userName));
@@ -749,7 +776,19 @@ namespace Project
                 Console.WriteLine("O servidor " + serverUrl + " crashou.Vou remove-lo");
                 lock (this.Available_Servers) //is this the fix??
                 {
-                    this.Available_Servers.Remove(this.myURL);
+                    this.Available_Servers.Remove(serverUrl);
+                }
+
+                lock (tickets)
+                {
+                    tickets.Remove(serverUrl);
+                }
+
+
+                if (masterServer == serverUrl)
+                {
+                    //Start Leader_Election
+                    leader_election("LE", this.lastTicket, this.myURL, this.myURL, serverUrl); //url is from the masterPuppet
                 }
             }
         }
@@ -933,20 +972,20 @@ namespace Project
 
                 lock (this.PendingCommands)
                 {
-                    if(!this.PendingCommands.ContainsKey(topic))
+                    if (!this.PendingCommands.ContainsKey(topic))
                         this.PendingCommands.Add(topic, command);
                 }
                 Monitor.PulseAll(this.MyVectorClock);
             }
-            
+
         }
 
         public static bool checkClock(string serverURL, Dictionary<string, int> clock1, Dictionary<string, int> clock2)
         {
-            
+
             foreach (KeyValuePair<string, int> entry in clock1)
             {
-                if(!clock2.ContainsKey(entry.Key))
+                if (!clock2.ContainsKey(entry.Key))
                 {
                     return false;
                 }
@@ -970,7 +1009,7 @@ namespace Project
                 {
                     lock (tickets)
                     {
-                        this.tickets.Add(serverURL, 0);
+                        this.tickets.Add(serverURL, -1);
                     }
                     this.MyVectorClock.Add(serverURL, 0);
                     this.Available_Servers.Add(serverURL);
@@ -1005,11 +1044,16 @@ namespace Project
                 }
             }
 
+            if (masterServer == this.myURL)
+            {
+                Console.WriteLine("IM THE MASTER!!");
+            }
+
             Console.WriteLine("Server id: " + id + " Server url: " + this.myURL);
             //Console.WriteLine("Maximum Faults: " + maxFaults);
             //Console.WriteLine("Maximum Delay: " +  maxDelay);
             //Console.WriteLine("Minimum Delay: " +  minDelay);
-            
+
             Console.WriteLine("Servers that are alive: ");
             lock (this.Available_Servers)
             {
@@ -1044,7 +1088,7 @@ namespace Project
                     Console.WriteLine("\t\t\t " + Proposals[s].PrintInfo());
                 }
             } else { Console.WriteLine("\t No Proposals Available"); }
-          
+
             //FIXME add lock
             Console.WriteLine("Locations and Meetings: ");
             if (Meetings.Keys.Count != 0)
@@ -1103,7 +1147,7 @@ namespace Project
             string value = "";
             foreach (KeyValuePair<string, int> entry in clock1)
             {
-                if(!clock2.ContainsKey(entry.Key))
+                if (!clock2.ContainsKey(entry.Key))
                 {
                     value = "#";
                 }
@@ -1118,7 +1162,7 @@ namespace Project
 
         public int GetTicket(string topic, string serverURL, Dictionary<string, int> vectorClock)
         {
-            
+
             lock (this.MyVectorClock)
             {
                 printClocks(serverURL, vectorClock, this.MyVectorClock);
@@ -1139,7 +1183,7 @@ namespace Project
                             return 0; //default value for already existing tickets FIXME fault tolerance
                                       //FIXME in case of failure, check with everyone
                         }
-                        
+
                         ticket++;
                         this.Tickets.Add(topic, new Ticket(ticket, serverURL, this.PendingCommands[topic]));
                         Monitor.PulseAll(this.MyVectorClock);
@@ -1172,8 +1216,30 @@ namespace Project
 
         private void DoPropagateTicket(string url, string originalSender, int ticket, string topic, AbstractMeeting am, Dictionary<string, int> vectorClock)
         {
-            ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
-            si.ReceiveTicketResult(topic, originalSender, this.myURL, ticket, am, vectorClock);
+            try
+            {
+                ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
+                si.ReceiveTicketResult(topic, originalSender, this.myURL, ticket, am, vectorClock);
+            }
+            catch (SocketException)
+            {
+                Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo");
+                lock (this.Available_Servers) //is this the fix??
+                {
+                    this.Available_Servers.Remove(url);
+                }
+
+                lock (tickets)
+                {
+                    tickets.Remove(url);
+                }
+
+                if (masterServer == url)
+                {
+                    //Start Leader_Election
+                    leader_election("LE", this.lastTicket, this.myURL, this.myURL, url); //url is from the masterPuppet
+                }
+            }
         }
 
         public void ReceiveTicketResult(string topic, string originalSender, string serverURL, int ticket, AbstractMeeting am, Dictionary<string, int> vectorClock)
@@ -1269,16 +1335,16 @@ namespace Project
                                 }
                                 else
                                 {
-                                    foreach(Meeting meeting in this.Meetings[m.Slot.Location.Local].Meetings)
+                                    foreach (Meeting meeting in this.Meetings[m.Slot.Location.Local].Meetings)
                                     {
-                                        if(meeting.Topic == m.Topic)
+                                        if (meeting.Topic == m.Topic)
                                         {
                                             p = meeting;
                                             break;
                                         }
                                     }
                                 }
-                                    
+
                                 foreach (Attendee a in p.Attendees)
                                 {
                                     bool notIn = true;
@@ -1297,14 +1363,14 @@ namespace Project
                                         {
                                             slots.Add(s.Location.Local + "," + s.Date);
                                         }
-                                        DoJoin command  = new DoJoin(topic, a.Name, slots, this.MyVectorClock, this.myURL);
-                                        command.setCommandId(command.getCommandId() + a.Name); 
+                                        DoJoin command = new DoJoin(topic, a.Name, slots, this.MyVectorClock, this.myURL);
+                                        command.setCommandId(command.getCommandId() + a.Name);
                                         pendingJoins.Add(a.Name, command);
                                     }
 
                                 }
                             }
-                                
+
                             if (this.masterServer != this.myURL)
                             {
                                 this.Tickets.Add(topic, new Ticket(ticket, serverURL, this.PendingCommands[topic]));
@@ -1346,7 +1412,7 @@ namespace Project
             string topic = command.Topic + userName;
             int newTicket;
             Dictionary<string, int> vectorClock;
-            
+
             lock (this.MyVectorClock)
             {
                 lock (this.PendingCommands)
@@ -1365,7 +1431,7 @@ namespace Project
                     Dictionary<string, int> clock = new Dictionary<string, int>(this.MyVectorClock);
                     PropagateClose(command, topic, this.myURL, clock);
                     this.MyVectorClock[this.myURL]++;
-                    if (masterServer == this.myURL)
+                    if (masterServer == this.myURL) //Se o master estiver crashado nao faz isto
                     {
                         newTicket = GetTicket(topic, this.myURL, this.MyVectorClock);
                         if (newTicket == 0)
@@ -1377,8 +1443,29 @@ namespace Project
                     }
                     else
                     {
-                        ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), masterServer);
-                        newTicket = si.GetTicket(topic, this.myURL, this.MyVectorClock);
+                        newTicket = 0;
+                        try
+                        {
+                            ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), masterServer);
+                            newTicket = si.GetTicket(topic, this.myURL, this.MyVectorClock);
+                        }
+                        catch (SocketException)
+                        {
+                            //Remove from tickets and 
+                            lock (Available_Servers)
+                            {
+                                Available_Servers.Remove(masterServer);
+                            }
+
+                            lock (tickets)
+                            {
+                                tickets.Remove(masterServer);
+                            }
+
+                            leader_election("LE", lastTicket, this.myURL, this.myURL, masterServer); //isto e async
+                            //ExecuteTicket(command, userName); //BUG isto esta a executar tudo de novo por isso vai executar o close.
+
+                        }
                         if (newTicket == 0)
                         {
                             this.MyVectorClock[this.myURL]--;
@@ -1409,7 +1496,7 @@ namespace Project
 
 
 
-            
+
             AbstractMeeting am = command.Execute(this);
             lock (this.PendingCommands)
             {
@@ -1429,7 +1516,7 @@ namespace Project
             }
 
             PropagateTicket(newTicket, topic, this.myURL, am, vectorClock);
-            
+
         }
 
 
@@ -1439,16 +1526,17 @@ namespace Project
 
         /*
          TODO:
-            1-  Acabar leader_election
-            2- Make Sure que estou a remover o que foi crashado
+            1-  Acabar leader_election - DONE
+            2- Make Sure que estou a remover o que foi crashado - DONE
             3- Bloquear tickets quando estou LE = "LE"
-            4- Chamar o leader election
-            5 - Depois de LE continuar o processo
+            4- Chamar o leader election - DONE
+            5 - Depois de LE continuar o processo 
             6- Testar 
         */
 
         public void leader_election(string LE, int myTicket, string originalSender, string sender, string crashedServer)
         {
+            //Detetei falha e vou chamar todos os available servers
             //RB_Send, e depois o RB ha de chamar received_LE
             //Add my message before broadcast
             string msg_id = this.myURL + myTicket;
@@ -1457,12 +1545,65 @@ namespace Project
                 received_commands.Add(msg_id);
             }
 
+            //Update global LE
+            lock (LE)
+            {
+                if (this.LE != "LE")
+                    this.LE = "LE";
 
+                Monitor.PulseAll(LE);
+            }
+
+            lock (this.Available_Servers)
+            {
+                Thread[] pool = new Thread[this.Available_Servers.Count - 1];
+                int i = 0;
+                if (sender == this.myURL) //FIXME hardcoded delay
+                {
+                    this.waitBetweenRequests();
+                }
+                //printServers();
+                foreach (string serverURL in this.Available_Servers)
+                {
+                    if (this.myURL != serverURL)
+                    {
+                        string receiver = serverURL;
+                        pool[i] = new Thread(() => PropagateLE("LE", myTicket, originalSender, sender, receiver, crashedServer));
+                        pool[i].Start();
+                        i++;
+                    }
+                }
+            }
+        }
+
+        public void PropagateLE(string LE, int myTicket, string originalSender, string sender, string receiver, string crashedServer)
+        {
+            try
+            {//FIXME
+                ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), receiver);
+                si.received_LE(LE, myTicket, originalSender, sender, crashedServer);
+            }
+            catch (SocketException e)
+            {
+                //Se crashar remover dos available servers e dos tickets
+                Console.WriteLine("O server " + receiver + " crashou! Vou Remover");
+                Console.WriteLine(e);
+                lock (this.Available_Servers) //is this the fix??
+                {
+                    this.Available_Servers.Remove(receiver);
+                }
+
+                lock (tickets)
+                {
+                    this.tickets.Remove(receiver);
+                }
+
+            }
         }
 
         public void received_LE(string LE, int received_ticket, string originalSender, string sender, string crashedServer)
         {
-            
+
             //Vou ver se ja recebi esta mensagem
             string msg_id = originalSender + received_ticket;
             lock (received_commands)
@@ -1479,9 +1620,11 @@ namespace Project
             }
 
             //Update global LE
-            lock (LE) 
-            { 
-                this.LE = "LE"; 
+            lock (LE)
+            {
+                if (this.LE != "LE")
+                    this.LE = "LE";
+
                 Monitor.PulseAll(LE);
             }
 
@@ -1508,13 +1651,13 @@ namespace Project
 
             lock (tickets)
             {
-                while(notAllTickets())
+                while (notAllTickets())
                 {
                     Monitor.Wait(tickets);
                 }
                 Monitor.PulseAll(tickets);
             }
-            
+
             //Decide leader
             (string new_leader, int new_ticket) = decide_new_leader();
             lock (masterServer)
@@ -1522,10 +1665,9 @@ namespace Project
                 this.masterServer = new_leader;
             }
             this.lastTicket = new_ticket;
-  
+
             //Reset ticket
             reset_ticket();
-
 
             lock (LE)
             {
@@ -1533,13 +1675,15 @@ namespace Project
                 Monitor.PulseAll(LE);
             }
 
+            Console.WriteLine("JA HA NOVO LEADER");
+
         }
 
         public Boolean notAllTickets()
         {
             foreach (string s in tickets.Keys)
             {
-                if (tickets[s] == 0)
+                if (tickets[s] == -1)
                 {
                     return true;
                 }
@@ -1549,19 +1693,20 @@ namespace Project
 
         public (string, int) decide_new_leader()
         {
-            int temp_i = 0;
+            int temp_i = -1;
             string temp_s = "";
-            lock(tickets)
+            lock (tickets)
             {
                 foreach (string s in tickets.Keys)
                 {
-                    if(tickets[s] > temp_i)
+                    if (tickets[s] > temp_i)
                     {
                         temp_i = tickets[s];
+                        temp_s = s;
                     }
-                    else if(tickets[s] == temp_i)
+                    else if (tickets[s] == temp_i)
                     {
-                        if(string.Compare(temp_s, s, comparisonType: StringComparison.OrdinalIgnoreCase) < 0)
+                        if (string.Compare(temp_s, s, comparisonType: StringComparison.OrdinalIgnoreCase) < 0)
                         {
                             temp_s = s;
                         }
@@ -1577,9 +1722,26 @@ namespace Project
             {
                 foreach (string s in tickets.Keys)
                 {
-                    tickets[s] = 0;
+                    tickets[s] = -1;
                 }
 
+            }
+        }
+
+        public void printServers()
+        {
+
+            Console.WriteLine("Servers that are alive: ");
+            lock (this.Available_Servers)
+            {
+                if (this.Available_Servers.Count != 0)
+                {
+                    foreach (string serverURL in this.Available_Servers)
+                    {
+                        Console.WriteLine("Server: " + serverURL);
+                    }
+                }
+                else { Console.WriteLine("No Servers Available"); }
             }
         }
 
