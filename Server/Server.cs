@@ -30,7 +30,7 @@ namespace Project
 
             IDictionary props = new Hashtable();
             props["port"] = uri.Port;
-            props["timeout"] = 30000; // in milliseconds
+            props["timeout"] = 6000; // in milliseconds
             TcpChannel channel = new TcpChannel(props, null, provider);
 
             try
@@ -678,6 +678,7 @@ namespace Project
                 lock (tickets)
                 {
                     tickets.Remove(url);
+                    Monitor.PulseAll(tickets);
                 }
 
                 if (masterServer == url)
@@ -729,11 +730,19 @@ namespace Project
                 lock (tickets)
                 {
                     tickets.Remove(url);
+                    Monitor.PulseAll(tickets);
                 }
 
                 if (masterServer == url)
                 {
                     //Start Leader_Election
+
+
+                    lock (tickets) //Add my own ticket
+                    {
+                        tickets[this.myURL] = this.lastTicket;
+                    }
+
                     Console.WriteLine("LEADER ELECTION!!!");
                     leader_election("LE", this.lastTicket, this.myURL, this.myURL, url); //url is from the masterPuppet
                 }
@@ -782,6 +791,7 @@ namespace Project
                 lock (tickets)
                 {
                     tickets.Remove(serverUrl);
+                    Monitor.PulseAll(tickets);
                 }
 
 
@@ -1232,6 +1242,7 @@ namespace Project
                 lock (tickets)
                 {
                     tickets.Remove(url);
+                    Monitor.PulseAll(tickets);
                 }
 
                 if (masterServer == url)
@@ -1460,6 +1471,7 @@ namespace Project
                             lock (tickets)
                             {
                                 tickets.Remove(masterServer);
+                                 Monitor.PulseAll(tickets);
                             }
 
                             leader_election("LE", lastTicket, this.myURL, this.myURL, masterServer); //isto e async
@@ -1568,7 +1580,7 @@ namespace Project
                     if (this.myURL != serverURL)
                     {
                         string receiver = serverURL;
-                        pool[i] = new Thread(() => PropagateLE("LE", myTicket, originalSender, sender, receiver, crashedServer));
+                        pool[i] = new Thread(() => PropagateLE("LE", myTicket, originalSender, sender, receiver, crashedServer)); //sender  -> myUrl
                         pool[i].Start();
                         i++;
                     }
@@ -1587,7 +1599,7 @@ namespace Project
             {
                 //Se crashar remover dos available servers e dos tickets
                 Console.WriteLine("O server " + receiver + " crashou! Vou Remover");
-                Console.WriteLine(e);
+                //Console.WriteLine(e);
                 lock (this.Available_Servers) //is this the fix??
                 {
                     this.Available_Servers.Remove(receiver);
@@ -1596,6 +1608,7 @@ namespace Project
                 lock (tickets)
                 {
                     this.tickets.Remove(receiver);
+                    Monitor.PulseAll(tickets);
                 }
 
             }
@@ -1636,6 +1649,7 @@ namespace Project
             lock (tickets)
             {
                 tickets.Remove(crashedServer);
+                Monitor.PulseAll(tickets);
             }
 
             lock (tickets) //Save the ticket from server p
@@ -1643,10 +1657,16 @@ namespace Project
                 tickets[originalSender] = received_ticket;
                 Monitor.PulseAll(tickets);  //Wake every spleeping thread that are waiting for acks
             }
-            leader_election("LE", received_ticket, originalSender, sender, crashedServer); //RB da mensagem que acabei de receber
+            Console.WriteLine("BROADCAST DO QUE ACABEI DE RECEBER");
+            leader_election("LE", received_ticket, originalSender, this.myURL, crashedServer); //RB da mensagem que acabei de receber
 
             //RB do meu ticket
             int myTicket = this.lastTicket;
+            lock (tickets) //Add my own ticket
+            {
+                tickets[this.myURL] = myTicket;
+            }
+            Console.WriteLine("BROADCAST DO MEU TICKET");
             leader_election("LE", myTicket, this.myURL, this.myURL, crashedServer);
 
             lock (tickets)
@@ -1664,11 +1684,26 @@ namespace Project
             {
                 this.masterServer = new_leader;
             }
-            this.lastTicket = new_ticket;
+            //this.lastTicket = new_ticket;
 
             //Reset ticket
-            reset_ticket();
+            Console.WriteLine("Reset dos tickets");
+            Console.WriteLine(masterServer);
+            //lock (tickets)
+            //{
+            //    reset_ticket();
+            //}
 
+            //lock (tickets)
+            //{
+            //    foreach (string s in tickets.Keys)
+            //    {
+            //        tickets[s] = -1;
+            //    }
+
+            //}
+
+            Console.WriteLine("Nao crashei!!");
             lock (LE)
             {
                 this.LE = "DONE";
@@ -1681,14 +1716,17 @@ namespace Project
 
         public Boolean notAllTickets()
         {
-            foreach (string s in tickets.Keys)
+            lock (tickets)
             {
-                if (tickets[s] == -1)
+                foreach (string s in tickets.Keys)
                 {
-                    return true;
+                    if (tickets[s] == -1)
+                    {
+                        return true;
+                    }
                 }
+                return false;
             }
-            return false;
         }
 
         public (string, int) decide_new_leader()
@@ -1718,14 +1756,7 @@ namespace Project
 
         public void reset_ticket()
         {
-            lock (tickets)
-            {
-                foreach (string s in tickets.Keys)
-                {
-                    tickets[s] = -1;
-                }
-
-            }
+           
         }
 
         public void printServers()
