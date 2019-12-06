@@ -1,1 +1,2 @@
-tcp://localhost:10000/PCS
+tcp://branco:10000/PCS
+tcp://brandy:10000/PCS

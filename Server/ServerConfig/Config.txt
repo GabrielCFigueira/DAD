@@ -1,2 +1,2 @@
-Lisboa:0
-Porto:0
+Lisboa:1, room,2
+Porto:1, room2,2

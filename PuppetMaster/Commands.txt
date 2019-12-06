@@ -1,9 +1,7 @@
-Server s1 tcp://localhost:3001/server1 0 0 0
-Server s2 tcp://localhost:3002/server2 0 0 0
-Server s3 tcp://localhost:3003/server3 0 0 0
-Wait 5000
-AddRoom Lisboa 2 room1
-AddRoom Porto 2 room2a
-Client c1 tcp://localhost:4001/client1 tcp://localhost:3001/server1 ../../../Client/ClientScripts/cs1.txt
-Client c2 tcp://localhost:4002/client2 tcp://localhost:3002/server2 ../../../Client/ClientScripts/cs2.txt
-Client c3 tcp://localhost:4003/client3 tcp://localhost:3003/server3 ../../../Client/ClientScripts/cs3.txt
+Server s1 tcp://branco:3001/server1 2 0 0
+Server s2 tcp://branco:3002/server2 2 3000 3000
+Server s3 tcp://branco:3003/server3 2 0 0
+Wait 10000
+Client c1 tcp://brandy:4001/client1 tcp://branco:3001/server1 ../../../Client/ClientScripts/cs1.txt
+Client c2 tcp://brandy:4002/client2 tcp://branco:3002/server2 ../../../Client/ClientScripts/cs2.txt
+Client c3 tcp://brandy:4003/client3 tcp://branco:3003/server3 ../../../Client/ClientScripts/cs3.txt

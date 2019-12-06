@@ -30,7 +30,7 @@ namespace Project
 
             IDictionary props = new Hashtable();
             props["port"] = uri.Port;
-            props["timeout"] = 20000; // in milliseconds
+            props["timeout"] = 6000; // in milliseconds
             TcpChannel channel = new TcpChannel(props, null, provider);
 
             try
@@ -482,10 +482,12 @@ namespace Project
 
             Command command = new DoCreate(coordinator, topic, min_attendees, n_slots, n_invitees, slots, invitees);
             Proposal p;
+            Dictionary<string, int> clock;
             lock (this.MyVectorClock)
             {
                 p = (Proposal)command.Execute(this);
                 this.MyVectorClock[this.myURL]++;
+                clock = new Dictionary<string, int>(this.MyVectorClock);
                 Monitor.PulseAll(this.MyVectorClock);
             }
 
@@ -495,7 +497,6 @@ namespace Project
             }
             Console.WriteLine("Saí do received_commands");
 
-            Dictionary<string, int> clock = new Dictionary<string, int>(this.MyVectorClock);
             UpdateServers(command, this.myURL, clock);
             ClientInterface c = this.Clients[coordinator];
             Console.WriteLine("Tenho " + this.Clients.Count + " clientes");
@@ -533,20 +534,22 @@ namespace Project
                 }
                 else
                 {
+                    Dictionary<string, int> clock;
+                    Command command;
                     lock (this.MyVectorClock)
                     {
                         this.MyVectorClock[this.myURL]++;
-                        Command command = new DoJoin(topic, userName, slots, this.MyVectorClock, this.myURL);
+                        command = new DoJoin(topic, userName, slots, this.MyVectorClock, this.myURL);
                         lock (received_commands)
                         {
                             received_commands.Add(command.getCommandId());
                         }
                         command.Execute(this);
 
-                        Dictionary<string, int> clock = new Dictionary<string, int>(this.MyVectorClock);
-                        UpdateServers(command, this.myURL, clock);
+                        clock = new Dictionary<string, int>(this.MyVectorClock);
                         Monitor.PulseAll(this.MyVectorClock);
                     }
+                    UpdateServers(command, this.myURL, clock);
                 }
             }
 
@@ -748,7 +751,8 @@ namespace Project
                 if (masterServer == url)
                 {
                     //Start Leader_Election
-                    leader_election("LE", this.lastTicket, this.myURL, this.myURL, url); //url is from the masterPuppet
+                    Thread thread = new Thread(() => leader_election("LE", this.lastTicket, this.myURL, this.myURL, url));
+                    thread.Start();
                 }
             }
         }
@@ -818,7 +822,8 @@ namespace Project
                     }
 
                     Console.WriteLine("LEADER ELECTION!!!");
-                    leader_election("LE", this.lastTicket, this.myURL, this.myURL, url); //url is from the masterPuppet
+                    Thread thread = new Thread(() => leader_election("LE", this.lastTicket, this.myURL, this.myURL, url));
+                    thread.Start();
                 }
             }
         }
@@ -836,7 +841,7 @@ namespace Project
                 {
                     if(this.Available_Servers[i] != this.myURL && this.Available_Servers[i] != "failed")
                     {
-                        string url = this.Available_Servers[i]; //FIXME outra solução para remover elementos
+                        string url = this.Available_Servers[i]; 
                         pool[i - 1] = new Thread(() => DoUpdateClient(url, clientUrl, userName));
                         pool[i - 1].Start();
                     }
@@ -871,7 +876,8 @@ namespace Project
                 if (masterServer == serverUrl)
                 {
                     //Start Leader_Election
-                    leader_election("LE", this.lastTicket, this.myURL, this.myURL, serverUrl); //url is from the masterPuppet
+                    Thread thread = new Thread(() => leader_election("LE", this.lastTicket, this.myURL, this.myURL, serverUrl));
+                    thread.Start();
                 }
             }
         }
@@ -1384,7 +1390,8 @@ namespace Project
                 if (masterServer == url)
                 {
                     //Start Leader_Election
-                    leader_election("LE", this.lastTicket, this.myURL, this.myURL, url); //url is from the masterPuppet
+                    Thread thread = new Thread(() => leader_election("LE", this.lastTicket, this.myURL, this.myURL, url));
+                    thread.Start();
                 }
             }
         }
@@ -1577,8 +1584,9 @@ namespace Project
         {
             string topic = command.getCommandId();
             int newTicket;
+            Dictionary<string, int> clock = null;
             Dictionary<string, int> vectorClock;
-
+            bool propagate = false;
             lock (this.MyVectorClock)
             {
                 lock (this.PendingCommands)
@@ -1588,14 +1596,21 @@ namespace Project
                         if (!received_commands.Contains(topic))
                             received_commands.Add(topic);
                     }
-                    Console.WriteLine("achtung!2");
                     if (!this.PendingCommands.ContainsKey(topic))
                     {
                         this.PendingCommands.Add(topic, command);
                         this.MyVectorClock[this.myURL]++;
-                        Dictionary<string, int> clock = new Dictionary<string, int>(this.MyVectorClock);
-                        PropagateClose(command, topic, this.myURL, clock);
+                        clock = new Dictionary<string, int>(this.MyVectorClock);
+                        propagate = true;
                     }
+                }
+            }
+            if (propagate)
+                PropagateClose(command, topic, this.myURL, clock);
+            lock (this.MyVectorClock)
+            {
+                lock (this.PendingCommands)
+                {
                     this.MyVectorClock[this.myURL]++;
                     if (masterServer == this.myURL) //Se o master estiver crashado nao faz isto
                     {
@@ -1638,10 +1653,9 @@ namespace Project
                                 tickets.Remove(masterServer);
                                 Monitor.PulseAll(tickets);
                             }
-
-                            leader_election("LE", lastTicket, this.myURL, this.myURL, masterServer); //isto e async
-
-                            Monitor.PulseAll(this.MyVectorClock); //FIXME goto?
+                            Thread thread = new Thread(() => leader_election("LE", lastTicket, this.myURL, this.myURL, masterServer));
+                            thread.Start();
+                            Monitor.PulseAll(this.MyVectorClock);
                             return;
                         }
                     }
@@ -1683,7 +1697,6 @@ namespace Project
             }
 
             PropagateTicket(newTicket, topic, this.myURL, am, vectorClock);
-
         }
 
 
