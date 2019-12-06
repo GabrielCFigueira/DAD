@@ -30,7 +30,7 @@ namespace Project
 
             IDictionary props = new Hashtable();
             props["port"] = uri.Port;
-            props["timeout"] = 6000; // in milliseconds
+            props["timeout"] = 20000; // in milliseconds
             TcpChannel channel = new TcpChannel(props, null, provider);
 
             try
@@ -164,9 +164,9 @@ namespace Project
                 lock (server.Proposals)
                 {
                     AbstractMeeting am = null;
-                    if (!server.Proposals.ContainsKey(this.Topic)) //FIXME join antes do create
+                    if (!server.Proposals.ContainsKey(this.Topic))
                     {
-                        Console.WriteLine("O cliente " + userName + " fez join atrasado a uma Meeting ja fechada, vamos tentar juntá-lo");
+                        
                         foreach (LocationMeetings lm in server.Meetings.Values)
                         {
                             foreach (Meeting m in lm.Meetings)
@@ -176,13 +176,15 @@ namespace Project
                                     am = m;
                                     if (am.Attendees.Count == m.SelectedRoom.Capacity)
                                     {
-                                        Console.WriteLine("Mas não há espaço suficiente");
+                                        Console.WriteLine("Não há espaço suficiente para um join atrasado");
                                         return am;
                                     }
+                                    Console.WriteLine("O cliente " + userName + " fez join atrasado a uma Meeting ja fechada, vamos tentar juntá-lo");
                                     goto label;
                                 }
                             }
                         }
+                        return null;
                     }
                     else
                     {
@@ -277,7 +279,7 @@ namespace Project
                 {
                     lock (server.Meetings)
                     {
-                        if (!server.Proposals.ContainsKey(this.Topic)) //FIXME join antes do create
+                        if (!server.Proposals.ContainsKey(this.Topic))
                         {
                             foreach (LocationMeetings lm in server.Meetings.Values)
                             {
@@ -372,7 +374,8 @@ namespace Project
                                 }
 
                                 Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, attendees);
-                                server.Meetings[chosenSlot.Location.Local].addMeeting(meeting); //FIXME dont add repeated meetings
+                                server.Meetings[chosenSlot.Location.Local].Meetings.Remove(meeting);
+                                server.Meetings[chosenSlot.Location.Local].addMeeting(meeting);
                                 server.Proposals.Remove(p.Topic);
 
                                 return meeting;
@@ -512,27 +515,29 @@ namespace Project
                 Monitor.PulseAll(this);
             }
 
-
-            if (!this.Proposals.ContainsKey(topic)) //FIXME pending create? FIXME lock nas Proposals
+            lock (this.Proposals)
             {
-                Console.WriteLine("No such open meeting as " + topic);
-                return; //FIXME give error message
-            }
-            else
-            {
-                lock (this.MyVectorClock)
+                if (!this.Proposals.ContainsKey(topic))
                 {
-                    this.MyVectorClock[this.myURL]++;
-                    Command command = new DoJoin(topic, userName, slots, this.MyVectorClock, this.myURL);
-                    lock (received_commands)
+                    Console.WriteLine("No such open meeting as " + topic);
+                    return; //FIXME give error message
+                }
+                else
+                {
+                    lock (this.MyVectorClock)
                     {
-                        received_commands.Add(command.getCommandId());
-                    }
-                    command.Execute(this);
+                        this.MyVectorClock[this.myURL]++;
+                        Command command = new DoJoin(topic, userName, slots, this.MyVectorClock, this.myURL);
+                        lock (received_commands)
+                        {
+                            received_commands.Add(command.getCommandId());
+                        }
+                        command.Execute(this);
 
-                    Dictionary<string, int> clock = new Dictionary<string, int>(this.MyVectorClock);
-                    UpdateServers(command, this.myURL, clock);
-                    Monitor.PulseAll(this.MyVectorClock);
+                        Dictionary<string, int> clock = new Dictionary<string, int>(this.MyVectorClock);
+                        UpdateServers(command, this.myURL, clock);
+                        Monitor.PulseAll(this.MyVectorClock);
+                    }
                 }
             }
 
@@ -674,6 +679,14 @@ namespace Project
 
         private void DoPropagate(string url, string senderURL, Command command, string topic, Dictionary<string, int> vectorClock)
         {
+            lock (this) //FIXME freeze entre servidores
+            {
+                while (freeze)
+                {
+                    Monitor.Wait(this);
+                }
+                Monitor.PulseAll(this);
+            }
             try
             {
                 ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
@@ -681,7 +694,7 @@ namespace Project
             }
             catch (SocketException)
             {
-                Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo");
+                Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo1");
                 lock (this.Available_Servers) //is this the fix??
                 {
                     this.Available_Servers.Remove(url);
@@ -695,10 +708,10 @@ namespace Project
             {
                 Thread[] pool = new Thread[this.Available_Servers.Count - 1];
                 int i = 0;
-                /*if (senderURL == this.myURL) //FIXME hardcoded delay
+                if (senderURL == this.myURL) //FIXME hardcoded delay
                 {
                     this.waitBetweenRequests();
-                }*/
+                }
                 for(i = 1; i < this.Available_Servers.Count; i++)
                 {
                     if (this.myURL != this.Available_Servers[i])
@@ -713,15 +726,23 @@ namespace Project
 
         private void DoUpdate(string url, string senderURL, Command command, Dictionary<string, int> vectorClock)
         {
+            lock (this) //FIXME freeze entre servidores
+            {
+                while (freeze)
+                {
+                    Monitor.Wait(this);
+                }
+                Monitor.PulseAll(this);
+            }
             try
-            {//FIXME
+            {
                 ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
                 si.UpdateMeeting(command, senderURL, this.myURL, vectorClock);
             }
             catch (SocketException)
             {
-                Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo");
-                lock (this.Available_Servers) //is this the fix??
+                Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo2");
+                lock (this.Available_Servers)
                 {
                     this.Available_Servers.Remove(url);
                 }
@@ -732,7 +753,7 @@ namespace Project
 
         public void UpdateServersClients(String clientUrl, String userName)
         {
-            lock (this.Available_Servers) //FIXME
+            lock (this.Available_Servers)
             {
 
                 Thread[] pool = new Thread[this.Available_Servers.Count];
@@ -741,7 +762,7 @@ namespace Project
                 {
                     if(this.Available_Servers[i] != this.myURL)
                     {
-                        string url = this.Available_Servers[i];
+                        string url = this.Available_Servers[i]; //FIXME outra solução para remover elementos
                         pool[i - 1] = new Thread(() => DoUpdateClient(url, clientUrl, userName));
                         pool[i - 1].Start();
                     }
@@ -760,7 +781,7 @@ namespace Project
             }
             catch (SocketException)
             {
-                Console.WriteLine("O servidor " + serverUrl + " crashou.Vou remove-lo");
+                Console.WriteLine("O servidor " + serverUrl + " crashou.Vou remove-lo3");
                 lock (this.Available_Servers) //is this the fix??
                 {
                     this.Available_Servers.Remove(this.myURL);
@@ -808,7 +829,7 @@ namespace Project
             int x = this.maxFaults;
             lock (acks)
             {
-                while (acks[id].Count < x)
+                while (acks[id].Count < x && acks[id].Count < this.Available_Servers.Count)
                 {
                     Monitor.Wait(acks);
                 }
@@ -865,7 +886,7 @@ namespace Project
             int x = this.maxFaults;
             lock (acks)
             {
-                while (acks[command_id].Count < x) //FIXME || acks[command_id].Count < this.MyVectorClock.Count)
+                while (acks[command_id].Count < x && acks[command_id].Count < this.Available_Servers.Count)
                 {
                     Monitor.Wait(acks);
                 }
@@ -918,13 +939,15 @@ namespace Project
                     return;
                 }
             }
+
+            
             PropagateClose(command, topic, originalSender, vectorClock);
             //From this point message will be delivered
             //Number of fails
             int x = this.maxFaults;
             lock (acks)
             {
-                while (acks[command_id].Count < x)
+                while (acks[command_id].Count < x && acks[command_id].Count < this.Available_Servers.Count)
 
                 {
                     Monitor.Wait(acks);
@@ -949,6 +972,7 @@ namespace Project
                     if(!this.PendingCommands.ContainsKey(topic))
                         this.PendingCommands.Add(topic, command);
                 }
+                Console.WriteLine("adicionei um close nos pendings");
                 Monitor.PulseAll(this.MyVectorClock);
             }
             
@@ -1102,7 +1126,14 @@ namespace Project
 
         public void Ping()
         {
-
+            lock (this) //FIXME freeze entre servidores
+            {
+                while (freeze)
+                {
+                    Monitor.Wait(this);
+                }
+                Monitor.PulseAll(this);
+            }
         }
 
         private void localShutdown()
@@ -1132,7 +1163,16 @@ namespace Project
 
         public int GetTicket(string topic, string serverURL, Dictionary<string, int> vectorClock)
         {
-            
+            lock (this) //FIXME freeze entre servidores
+            {
+                while (freeze)
+                {
+                    Monitor.Wait(this);
+                }
+                Monitor.PulseAll(this);
+            }
+
+            Console.WriteLine("A ticket was requested by " + serverURL + "for topic " + topic);
             lock (this.MyVectorClock)
             {
                 printClocks(serverURL, vectorClock, this.MyVectorClock);
@@ -1146,7 +1186,7 @@ namespace Project
                     lock (this.Tickets)
                     {
 
-                        if (this.Tickets.ContainsKey(topic) && serverURL != this.myURL) //FIXME
+                        if (this.Tickets.ContainsKey(topic) && serverURL != this.myURL)
                         {
                             Monitor.PulseAll(this.MyVectorClock);
                             Monitor.PulseAll(this.Tickets);
@@ -1167,7 +1207,7 @@ namespace Project
                                 lock (this.Available_Servers)
                                 {
                                     if(this.Available_Servers.Contains(url))
-                                    Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo");
+                                    Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo4");
                                     this.Available_Servers.Remove(url);
                                 }
                             }
@@ -1207,6 +1247,14 @@ namespace Project
 
         private void DoPropagateTicket(string url, string originalSender, int ticket, string topic, AbstractMeeting am, Dictionary<string, int> vectorClock)
         {
+            lock (this) //FIXME freeze entre servidores
+            {
+                while (freeze)
+                {
+                    Monitor.Wait(this);
+                }
+                Monitor.PulseAll(this);
+            }
             try
             {
                 ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
@@ -1214,7 +1262,7 @@ namespace Project
             }
             catch (SocketException)
             {
-                Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo");
+                Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo5");
                 lock (this.Available_Servers) //is this the fix??
                 {
                     this.Available_Servers.Remove(url);
@@ -1262,13 +1310,14 @@ namespace Project
             int x = this.maxFaults;
             lock (acks)
             {
-                while (acks[msg_id].Count < x)
+                while (acks[msg_id].Count < x && acks[msg_id].Count < this.Available_Servers.Count)
                 {
                     Monitor.Wait(acks);
                 }
                 Monitor.PulseAll(acks);
             }
 
+            Dictionary<string, int> clock;
             lock (this.MyVectorClock)
             {
                 printClocks(originalSender, vectorClock, this.MyVectorClock);
@@ -1279,6 +1328,7 @@ namespace Project
 
 
                 this.MyVectorClock[originalSender] = Math.Max(vectorClock[originalSender], this.MyVectorClock[originalSender]);
+                clock = new Dictionary<string, int>(this.MyVectorClock);
                 Monitor.PulseAll(this.MyVectorClock);
             }
 
@@ -1294,6 +1344,9 @@ namespace Project
                 }
                 Monitor.PulseAll(this.Tickets);
             }
+
+            Console.WriteLine("Receiving ticket " + ticket + " result for topic "+ topic);
+            
             lock (this.Proposals)
             {
                 lock (this.Meetings)
@@ -1309,6 +1362,7 @@ namespace Project
                             else
                             {
                                 Meeting m = (Meeting)am;
+                                this.Meetings[m.Slot.Location.Local].Meetings.Remove(m);
                                 this.Meetings[m.Slot.Location.Local].addMeeting(m); //FIXME must replace, not add
                                 AbstractMeeting p = null;
                                 if (this.Proposals.ContainsKey(am.Topic))
@@ -1346,7 +1400,7 @@ namespace Project
                                         {
                                             slots.Add(s.Location.Local + "," + s.Date);
                                         }
-                                        DoJoin command  = new DoJoin(m.Topic, a.Name, slots, this.MyVectorClock, this.myURL);
+                                        DoJoin command  = new DoJoin(m.Topic, a.Name, slots, clock, this.myURL);
                                         command.setCommandId("late " + command.getCommandId()); 
                                         pendingJoins.Add(command);
                                         Console.WriteLine("detected");
@@ -1399,6 +1453,7 @@ namespace Project
             
             lock (this.MyVectorClock)
             {
+                Console.WriteLine("achtung!1");
                 lock (this.PendingCommands)
                 {
                     lock (received_commands) //Adding my message to my received_commands
@@ -1406,7 +1461,7 @@ namespace Project
                         if (!received_commands.Contains(topic))
                             received_commands.Add(topic);
                     }
-
+                    Console.WriteLine("achtung!2");
                     if (!this.PendingCommands.ContainsKey(topic))
                     {
                         this.PendingCommands.Add(topic, command);
@@ -1422,23 +1477,38 @@ namespace Project
                         {
                             this.MyVectorClock[this.myURL]--;
                             Monitor.PulseAll(this.MyVectorClock);
+                            Console.WriteLine("achtung!3");
                             return;
                         }
                     }
                     else
                     {
-                        ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), masterServer);
-                        newTicket = si.GetTicket(topic, this.myURL, this.MyVectorClock);
-                        if (newTicket == 0)
+                        try
+                        {
+                            ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), masterServer);
+                            newTicket = si.GetTicket(topic, this.myURL, this.MyVectorClock);
+                            if (newTicket == 0)
+                            {
+                                this.MyVectorClock[this.myURL]--;
+                                Monitor.PulseAll(this.MyVectorClock);
+                                Console.WriteLine("achtung!3");
+                                return;
+                            }
+                            lock (this.Tickets)
+                            {
+                                this.Tickets.Add(topic, new Ticket(newTicket, this.myURL, this.PendingCommands[topic]));
+                                Monitor.PulseAll(this.Tickets);
+                            }
+                        } catch (SocketException)
                         {
                             this.MyVectorClock[this.myURL]--;
+                            Console.WriteLine("O servidor master " + masterServer + " crashou.Vou remove-lo6");
+                            lock (this.Available_Servers)
+                            {
+                                this.Available_Servers.Remove(masterServer);
+                            }
                             Monitor.PulseAll(this.MyVectorClock);
                             return;
-                        }
-                        lock (this.Tickets)
-                        {
-                            this.Tickets.Add(topic, new Ticket(newTicket, this.myURL, this.PendingCommands[topic]));
-                            Monitor.PulseAll(this.Tickets);
                         }
                     }
                 }
@@ -1485,6 +1555,7 @@ namespace Project
         {
             while (true)
             {
+                Thread.Sleep(500);
                 lock (this.MyVectorClock)
                 {
                     lock (this.PendingCommands)
@@ -1502,7 +1573,7 @@ namespace Project
                         
                     }
                 }
-                Thread.Sleep(100);
+                
             }
         }
 
