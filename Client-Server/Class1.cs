@@ -61,6 +61,8 @@ namespace Project
 
         (String,String) getRandomClientName();
 
+        void Ping();
+
     }
 
     [Serializable]

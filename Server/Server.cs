@@ -30,7 +30,7 @@ namespace Project
 
             IDictionary props = new Hashtable();
             props["port"] = uri.Port;
-            props["timeout"] = 3000; // in milliseconds
+            props["timeout"] = 6000; // in milliseconds
             TcpChannel channel = new TcpChannel(props, null, provider);
 
             try
@@ -73,6 +73,8 @@ namespace Project
         int minDelay;
         int maxDelay;
 
+        Thread thread;
+
         String masterServer;
         Int32 ticket = 0;
         Int32 lastTicket = 0;
@@ -104,7 +106,7 @@ namespace Project
                 this.n_invitees = n_invitees;
                 this.slots = slots;
                 this.invitees = invitees;
-                this.command_id = topic + "Create";  //id Create
+                this.command_id = "Create " + topic;  //id Create
             }
 
             override public AbstractMeeting Execute(ServerInterface si)
@@ -151,7 +153,7 @@ namespace Project
             {
                 this.userName = userName;
                 this.slots = slots;
-                this.command_id = topic +  userName;
+                this.command_id = "join " + topic + userName;
                 this.vectorClock = new Dictionary<string, int>(vectorClock);
                 this.serverURL = serverURL;
             }
@@ -265,7 +267,7 @@ namespace Project
                 : base(topic)
             {
                 this.userName = userName;
-                this.command_id = topic;
+                this.command_id = "close " + topic;
             }
 
             override public AbstractMeeting Execute(ServerInterface si)
@@ -275,6 +277,19 @@ namespace Project
                 {
                     lock (server.Meetings)
                     {
+                        if (!server.Proposals.ContainsKey(this.Topic)) //FIXME join antes do create
+                        {
+                            foreach (LocationMeetings lm in server.Meetings.Values)
+                            {
+                                foreach (Meeting m in lm.Meetings)
+                                {
+                                    if (m.Topic == this.Topic)
+                                    {
+                                        return m;
+                                    }
+                                }
+                            }
+                        }
                         Proposal p = server.Proposals[this.Topic];
                         Slot chosenSlot = null;
                         Room selectedRoom = null;
@@ -399,6 +414,9 @@ namespace Project
 
             this.masterServer = masterServer;
 
+            this.thread = new Thread(() => checkPendings());
+            this.thread.Start();
+
             //Reliable_Broadcast
             this.acks = new Dictionary<string, List<string>>();
             this.received_commands = new List<string>();
@@ -431,7 +449,7 @@ namespace Project
             }
             
             Command command = new DoClose(userName, topic);
-            ExecuteTicket(command, "");
+            ExecuteTicket(command);
                    
             
         }
@@ -851,7 +869,7 @@ namespace Project
                 {
                     Monitor.Wait(this.MyVectorClock);
                 }
-                this.MyVectorClock[originalSender]++;
+                this.MyVectorClock[originalSender] = Math.Max(vectorClock[originalSender],this.MyVectorClock[originalSender]);
 
                 command.Execute(this);
                 Monitor.PulseAll(this.MyVectorClock);
@@ -913,7 +931,7 @@ namespace Project
                     Monitor.Wait(this.MyVectorClock);
                 }
 
-                this.MyVectorClock[originalSender]++;
+                this.MyVectorClock[originalSender] = Math.Max(vectorClock[originalSender], this.MyVectorClock[originalSender]);
 
                 lock (this.PendingCommands)
                 {
@@ -1071,6 +1089,11 @@ namespace Project
             thread.Start();
         }
 
+        public void Ping()
+        {
+
+        }
+
         private void localShutdown()
         {
             Thread.Sleep(2000);
@@ -1112,12 +1135,34 @@ namespace Project
                     lock (this.Tickets)
                     {
 
-                        if (this.Tickets.ContainsKey(topic))
+                        if (this.Tickets.ContainsKey(topic) && serverURL != this.myURL) //FIXME
                         {
                             Monitor.PulseAll(this.MyVectorClock);
                             Monitor.PulseAll(this.Tickets);
-                            return 0; //default value for already existing tickets FIXME fault tolerance
-                                      //FIXME in case of failure, check with everyone
+                            return 0; 
+                        } else if (this.Tickets.ContainsKey(topic) && serverURL == this.myURL)
+                        {
+                            string url = Tickets[topic].ServerURL;
+                            try
+                            {
+                                url = Tickets[topic].ServerURL;
+                                ServerInterface si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
+                                si.Ping();
+                                return 0;
+                            }
+                            catch (SocketException)
+                            {
+                                
+                                lock (this.Available_Servers)
+                                {
+                                    if(this.Available_Servers.Contains(url))
+                                    Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo");
+                                    this.Available_Servers.Remove(url);
+                                }
+                            }
+                            Monitor.PulseAll(this.MyVectorClock);
+                            Monitor.PulseAll(this.Tickets);
+                            return ticket;
                         }
                         
                         ticket++;
@@ -1158,8 +1203,9 @@ namespace Project
 
         public void ReceiveTicketResult(string topic, string originalSender, string serverURL, int ticket, AbstractMeeting am, Dictionary<string, int> vectorClock)
         {
+
             //Reliable_BroadCast
-            string msg_id = topic + ticket;
+            string msg_id = topic + " " + ticket;
             lock (acks)
             {
                 if (acks.ContainsKey(msg_id))
@@ -1202,7 +1248,6 @@ namespace Project
                 Monitor.PulseAll(acks);
             }
 
-            Dictionary<string, Command> pendingJoins = new Dictionary<string, Command>();
             lock (this.MyVectorClock)
             {
                 printClocks(originalSender, vectorClock, this.MyVectorClock);
@@ -1212,14 +1257,17 @@ namespace Project
                 }
 
 
-                this.MyVectorClock[originalSender]++;
+                this.MyVectorClock[originalSender] = Math.Max(vectorClock[originalSender], this.MyVectorClock[originalSender]);
                 Monitor.PulseAll(this.MyVectorClock);
             }
+
+            List<Command> pendingJoins = new List<Command>();
+            
 
 
             lock (this.Tickets)
             {
-                while (ticket - 1 != lastTicket)
+                while (ticket - 1 > lastTicket)
                 {
                     Monitor.Wait(this.Tickets);
                 }
@@ -1235,17 +1283,17 @@ namespace Project
                         {
                             if (am.isProposal())
                             {
-                                this.Proposals[topic] = (Proposal)am;
+                                this.Proposals[am.Topic] = (Proposal)am;
                             }
                             else
                             {
                                 Meeting m = (Meeting)am;
                                 this.Meetings[m.Slot.Location.Local].addMeeting(m); //FIXME must replace, not add
                                 AbstractMeeting p = null;
-                                if (this.Proposals.ContainsKey(topic))
+                                if (this.Proposals.ContainsKey(am.Topic))
                                 {
-                                    p = this.Proposals[topic];
-                                    this.Proposals.Remove(topic);
+                                    p = this.Proposals[am.Topic];
+                                    this.Proposals.Remove(am.Topic);
                                 }
                                 else
                                 {
@@ -1270,27 +1318,28 @@ namespace Project
                                             break;
                                         }
                                     }
-                                    if (notIn && CouldAttend(m, a) && !this.PendingCommands.ContainsKey(topic + a.Name))
+                                    if (notIn && CouldAttend(m, a))
                                     {
                                         List<string> slots = new List<string>();
                                         foreach (Slot s in a.Available_slots)
                                         {
                                             slots.Add(s.Location.Local + "," + s.Date);
                                         }
-                                        DoJoin command  = new DoJoin(topic, a.Name, slots, this.MyVectorClock, this.myURL);
-                                        command.setCommandId(command.getCommandId() + a.Name); 
-                                        pendingJoins.Add(a.Name, command);
+                                        DoJoin command  = new DoJoin(m.Topic, a.Name, slots, this.MyVectorClock, this.myURL);
+                                        command.setCommandId("late " + command.getCommandId()); 
+                                        pendingJoins.Add(command);
+                                        Console.WriteLine("detected");
                                     }
 
                                 }
                             }
                                 
-                            if (this.masterServer != this.myURL)
+                            if (!this.Tickets.ContainsKey(topic))
                             {
                                 this.Tickets.Add(topic, new Ticket(ticket, serverURL, this.PendingCommands[topic]));
                             }
                             this.PendingCommands.Remove(topic);
-                            lastTicket++;
+                            lastTicket = Math.Max(lastTicket, ticket);
                             Monitor.PulseAll(this.Tickets);
                         }
                     }
@@ -1298,9 +1347,9 @@ namespace Project
 
             }
 
-            foreach (KeyValuePair<string, Command> entry in pendingJoins)
+            foreach (Command command in pendingJoins)
             {
-                ExecuteTicket(entry.Value, entry.Key);
+                ExecuteTicket(command);
             }
         }
 
@@ -1321,9 +1370,9 @@ namespace Project
             return false;
         }
 
-        private void ExecuteTicket(Command command, string userName)
+        private void ExecuteTicket(Command command)
         {
-            string topic = command.Topic + userName;
+            string topic = command.getCommandId();
             int newTicket;
             Dictionary<string, int> vectorClock;
             
@@ -1331,19 +1380,19 @@ namespace Project
             {
                 lock (this.PendingCommands)
                 {
-                    if (this.PendingCommands.ContainsKey(topic))
-                    {
-                        Monitor.PulseAll(this.MyVectorClock);
-                        return;
-                    }
                     lock (received_commands) //Adding my message to my received_commands
                     {
-                        received_commands.Add(command.getCommandId());
+                        if (!received_commands.Contains(topic))
+                            received_commands.Add(topic);
                     }
-                    this.PendingCommands.Add(topic, command);
-                    this.MyVectorClock[this.myURL]++;
-                    Dictionary<string, int> clock = new Dictionary<string, int>(this.MyVectorClock);
-                    PropagateClose(command, topic, this.myURL, clock);
+
+                    if (!this.PendingCommands.ContainsKey(topic))
+                    {
+                        this.PendingCommands.Add(topic, command);
+                        this.MyVectorClock[this.myURL]++;
+                        Dictionary<string, int> clock = new Dictionary<string, int>(this.MyVectorClock);
+                        PropagateClose(command, topic, this.myURL, clock);
+                    }
                     this.MyVectorClock[this.myURL]++;
                     if (masterServer == this.myURL)
                     {
@@ -1378,7 +1427,7 @@ namespace Project
 
             lock (this.Tickets)
             {
-                while (newTicket - 1 != lastTicket)
+                while (newTicket - 1 > lastTicket)
                 {
                     Monitor.Wait(this.Tickets);
                 }
@@ -1395,14 +1444,14 @@ namespace Project
             {
                 lock (this.Tickets)
                 {
-                    lastTicket++;
+                    lastTicket = Math.Max(newTicket, lastTicket);
                     this.PendingCommands.Remove(topic);
                     Monitor.PulseAll(this.Tickets);
                 }
             }
 
             //Before updateServers (reliable broadcast)
-            string msg_id = topic + newTicket;
+            string msg_id = topic + " " + newTicket;
             lock (received_commands) //Adding my message to my received_commands
             {
                 received_commands.Add(msg_id);
@@ -1410,6 +1459,30 @@ namespace Project
 
             PropagateTicket(newTicket, topic, this.myURL, am, vectorClock);
             
+        }
+        private void checkPendings()
+        {
+            while (true)
+            {
+                lock (this.MyVectorClock)
+                {
+                    lock (this.PendingCommands)
+                    {
+                        if (this.PendingCommands.Count > 0)
+                        {
+                            Random random = new Random();
+
+                            List<string> topics = Enumerable.ToList(this.PendingCommands.Keys);
+                            string topic = topics[random.Next(0, topics.Count - 1)];
+                            
+                            ExecuteTicket(this.PendingCommands[topic]);
+                            
+                        }
+                        
+                    }
+                }
+                Thread.Sleep(100);
+            }
         }
 
     }

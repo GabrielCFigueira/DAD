@@ -4,6 +4,7 @@ Server s3 tcp://localhost:3003/server3 0 0 0
 Wait 5000
 AddRoom Lisboa 2 room1
 AddRoom Porto 2 room2
-Client c1 tcp://localhost:4001/client1 tcp://localhost:3001/server1 ../../../Client/ClientScripts/cs1.txt
-Client c2 tcp://localhost:4002/client2 tcp://localhost:3002/server2 ../../../Client/ClientScripts/cs2.txt
-Client c3 tcp://localhost:4003/client3 tcp://localhost:3003/server3 ../../../Client/ClientScripts/cs3.txt
+Client c1 tcp://localhost:4001/client1 tcp://localhost:3001/server1 cs1.txt
+Client c2 tcp://localhost:4002/client2 tcp://localhost:3002/server2 cs2.txt
+Client c3 tcp://localhost:4003/client3 tcp://localhost:3002/server2 cs3.txt
+Status
