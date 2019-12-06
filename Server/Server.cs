@@ -1045,41 +1045,50 @@ namespace Project
             }
 
             Console.WriteLine("Clients:");
-            //FIXME add lock
-            if (Clients.Keys.Count != 0)
+            lock (this.Clients)
             {
-                foreach (string client in Clients.Keys)
+                if (Clients.Keys.Count != 0)
                 {
-                    Console.WriteLine("\t" + client);
+                    foreach (string client in Clients.Keys)
+                    {
+                        Console.WriteLine("\t" + client);
+                    }
                 }
-            } else { Console.WriteLine("\t No Clients Available"); }
+                else { Console.WriteLine("\t No Clients Available"); }
+            }
 
             Console.WriteLine("Proposals: ");
 
-            //FIXME add lock
-            if (Proposals.Keys.Count != 0)
+            lock (this.Proposals)
             {
-                foreach (string s in Proposals.Keys)
+                if (Proposals.Keys.Count != 0)
                 {
-                    Console.WriteLine("\t" + s);
-                    Console.WriteLine("\t\t\t " + Proposals[s].PrintInfo());
-                }
-            } else { Console.WriteLine("\t No Proposals Available"); }
-          
-            //FIXME add lock
-            Console.WriteLine("Locations and Meetings: ");
-            if (Meetings.Keys.Count != 0)
-            {
-                foreach (string location in Meetings.Keys)
-                {
-                    Console.WriteLine("\t" + location);
-                    foreach (Room room in Meetings[location].Location.Rooms)
+                    foreach (string s in Proposals.Keys)
                     {
-                        Console.WriteLine("\t\t" + room.ToString());
+                        Console.WriteLine("\t" + s);
+                        Console.WriteLine("\t\t\t " + Proposals[s].PrintInfo());
                     }
-                    Console.WriteLine("\t\t" + Meetings[location].ToString());
                 }
-            } else { Console.WriteLine("\t No Locations Available"); }
+                else { Console.WriteLine("\t No Proposals Available"); }
+            }
+
+            lock (this.Meetings)
+            {
+                Console.WriteLine("Locations and Meetings: ");
+                if (Meetings.Keys.Count != 0)
+                {
+                    foreach (string location in Meetings.Keys)
+                    {
+                        Console.WriteLine("\t" + location);
+                        foreach (Room room in Meetings[location].Location.Rooms)
+                        {
+                            Console.WriteLine("\t\t" + room.ToString());
+                        }
+                        Console.WriteLine("\t\t" + Meetings[location].ToString());
+                    }
+                }
+                else { Console.WriteLine("\t No Locations Available"); }
+            }
 
         }
 
