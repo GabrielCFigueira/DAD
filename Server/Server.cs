@@ -476,9 +476,9 @@ namespace Project
             else
                 totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, numberOfMessages));
             totalRounds += 3; //this is for gossip
-            //c.AddProposal(p);
-            c.Gossip(p,1,totalRounds,numberOfMessages);
-            
+            Thread thread = new Thread(() => c.Gossip(p, 1, totalRounds, numberOfMessages));
+            thread.Start();
+
         }
 
         public void JoinMeeting(String topic, String userName, List<String> slots)
@@ -626,11 +626,6 @@ namespace Project
                     if(entry.Key != userName)
                         clients[entry.Key] = entry.Value;
                 }
-            }
-
-            foreach(KeyValuePair<String,String> entry in clients)
-            {
-                Console.WriteLine("Vou-te dar este cliente: " + entry.Key);
             }
             return clients;
         }
