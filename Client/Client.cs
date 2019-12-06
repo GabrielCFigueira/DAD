@@ -30,7 +30,7 @@ namespace Project
                 BinaryServerFormatterSinkProvider provider = new BinaryServerFormatterSinkProvider();
                 IDictionary props = new Hashtable();
                 props["port"] = clientUri.Port;
-                props["timeout"] = 3000; // in milliseconds
+                props["timeout"] = 5000; // in milliseconds
                 TcpChannel channel = new TcpChannel(props, null, provider);
 
                 //TcpChannel channel = new TcpChannel(clientUri.Port);
@@ -126,25 +126,39 @@ namespace Project
 
         public void ReadCommands(String command)
         {
+            String actualServer = null;
             string[] commandParams = command.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
             if (commandParams.Length == 0)
                 return;
             switch (commandParams[0])
-            {
+            { 
                 case "list":
                     while (true)
                     {
                         try
                         {
-                            this.ListMeetings();
+                            actualServer = this.Server_url;
+                            lock (this.Server)
+                            {
+                                this.ListMeetings();
+                            }
                             break;
                         }
                         catch (SocketException)
                         {
-                            this.Server_url = GetNextAvailableServer();
-                            this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
-                            //this.ListMeetings();
-                            //break;
+                            lock (this.Server)
+                            {
+                                lock (this.Server_url)
+                                {
+                                    if (this.Server_url == actualServer)
+                                    {
+                                        this.Server_url = GetNextAvailableServer();
+                                        this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                                        //this.ListMeetings();
+                                        //break;
+                                    }
+                                }
+                            }
                         }
                     }
                     break;
@@ -171,15 +185,29 @@ namespace Project
                     {
                         try
                         {
-                            this.CreateProposal(meetingTopic, min_attendees, n_slots, n_invitees, meeting_slots, invitees);
+                            actualServer = this.Server_url;
+                            Console.WriteLine("Vou fazer o createProposal");
+                            lock (this.Server)
+                            {
+                                this.CreateProposal(meetingTopic, min_attendees, n_slots, n_invitees, meeting_slots, invitees);
+                            }
                             break;
                         }
                         catch (SocketException)
                         {
-                            this.Server_url = GetNextAvailableServer();
-                            this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
-                            //this.CreateProposal(meetingTopic, min_attendees, n_slots, n_invitees, meeting_slots, invitees);
-                            //break;
+                            lock (this.Server)
+                            {
+                                lock (this.Server_url)
+                                {
+                                    if (this.Server_url == actualServer)
+                                    {
+                                        this.Server_url = GetNextAvailableServer();
+                                        this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                                        //this.CreateProposal(meetingTopic, min_attendees, n_slots, n_invitees, meeting_slots, invitees);
+                                        //break;
+                                    }
+                                }
+                            }
                         }
                     }
                     break;
@@ -197,15 +225,28 @@ namespace Project
                     {
                         try
                         {
-                            this.JoinMeeting(topic, slots);
+                            actualServer = this.Server_url;
+                            lock (this.Server)
+                            {
+                                this.JoinMeeting(topic, slots);
+                            }
                             break;
                         }
                         catch (SocketException)
                         {
-                            this.Server_url = GetNextAvailableServer();
-                            this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
-                            //this.JoinMeeting(topic, slots);
-                            //break;
+                            lock (this.Server)
+                            {
+                                lock (this.Server_url)
+                                {
+                                    if (this.Server_url == actualServer)
+                                    {
+                                        this.Server_url = GetNextAvailableServer();
+                                        this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                                        //this.JoinMeeting(topic, slots);
+                                        //break;
+                                    }
+                                }
+                            }
                         }
                     }
                     break;
@@ -216,16 +257,29 @@ namespace Project
                     {
                         try
                         {
-                            this.CloseMeeting(meeting_topic);
+                            actualServer = this.Server_url;
+                            lock (this.Server)
+                            {
+                                this.CloseMeeting(meeting_topic);
+                            }
                             break;
                         }
                         catch (SocketException e)
                         {
-                            //Console.WriteLine(e.Message);
-                            this.Server_url = GetNextAvailableServer();
-                            this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
-                            //this.CloseMeeting(meeting_topic);
-                            //break;
+                            lock (this.Server)
+                            {
+                                lock (this.Server_url)
+                                {
+                                    if (this.Server_url == actualServer)
+                                    {
+                                        //Console.WriteLine(e.Message);
+                                        this.Server_url = GetNextAvailableServer();
+                                        this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                                        //this.CloseMeeting(meeting_topic);
+                                        //break;
+                                    }
+                                }
+                            }
                         }
                     }
                     break;
@@ -362,16 +416,44 @@ namespace Project
             //{
             //lock (this.Server_url)
             //{
-                    String actualServerUrl = this.Server_url;
-                    ServerInterface s = this.Server;
-                    String chosenClientName;
-                    String chosenClientURL;
+            String actualServerUrl = this.Server_url;
+            ServerInterface s = this.Server;
+            String chosenClientName;
+            String chosenClientURL;
 
+            while (true)
+            {
+                try
+                {
+                    (chosenClientName, chosenClientURL) = s.getRandomClientName();
+                    break;
+                }
+                catch (SocketException e)
+                {
+                    lock (this.Server)
+                    {
+                        lock (this.Server_url)
+                        {
+                            if (actualServerUrl == this.Server_url)
+                            {
+                                Console.WriteLine(e.Message);
+                                this.Server_url = GetNextAvailableServer();
+                                this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
+                            }
+                            //(chosenClientName, chosenClientURL) = this.Server.getRandomClientName();
+                        }
+                    }
+                }
+            }
+            lock (this.ClientsSent)
+            {
+                while (chosenClientName == this.UserName || this.ClientsSent.ContainsKey(chosenClientName))
+                {
                     try
                     {
                         (chosenClientName, chosenClientURL) = s.getRandomClientName();
                     }
-                    catch (SocketException e)
+                    catch (SocketException)
                     {
                         lock (this.Server)
                         {
@@ -379,46 +461,22 @@ namespace Project
                             {
                                 if (actualServerUrl == this.Server_url)
                                 {
-                                    Console.WriteLine(e.Message);
+                                    Console.WriteLine("O SERVIDOR " + this.Server_url + " CRASHOU");
                                     this.Server_url = GetNextAvailableServer();
                                     this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
                                 }
                                 (chosenClientName, chosenClientURL) = this.Server.getRandomClientName();
-                    }
-                        }
-                    }
-                    lock (this.ClientsSent)
-                    {
-                        while (chosenClientName == this.UserName || this.ClientsSent.ContainsKey(chosenClientName))
-                        {
-                            try
-                            {
-                                (chosenClientName, chosenClientURL) = s.getRandomClientName();
-                            }
-                            catch (SocketException)
-                            {
-                                lock (this.Server)
-                                {
-                                    lock (this.Server_url)
-                                    {
-                                        if (actualServerUrl == this.Server_url)
-                                        {
-                                            Console.WriteLine("O SERVIDOR " + this.Server_url + " CRASHOU");
-                                            this.Server_url = GetNextAvailableServer();
-                                            this.Server = (ServerInterface)Activator.GetObject(typeof(ServerInterface), this.Server_url);
-                                        }
-                                        (chosenClientName, chosenClientURL) = this.Server.getRandomClientName();
-                                    }
-                                }
                             }
                         }
-
-                        this.ClientsSent.Add(chosenClientName, chosenClientURL);
                     }
+                }
 
-                    Console.WriteLine("Mandei ao/a " + chosenClientURL);
-                    ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), chosenClientURL);
-                    chosenClient.Gossip(p, actualRound + 1, totalRounds, numberOfMessages);
+                this.ClientsSent.Add(chosenClientName, chosenClientURL);
+            }
+
+            Console.WriteLine("Mandei ao/a " + chosenClientURL);
+            ClientInterface chosenClient = (ClientInterface)Activator.GetObject(typeof(ClientInterface), chosenClientURL);
+            chosenClient.Gossip(p, actualRound + 1, totalRounds, numberOfMessages);
                 //}
             //}
         }
