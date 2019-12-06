@@ -496,10 +496,10 @@ namespace Project
                 totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, 2));
             else
                 totalRounds = (int)Math.Ceiling(Math.Log(this.Clients.Count, numberOfMessages));
-            totalRounds += 2; //this is for gossip
-            //c.AddProposal(p);
-            c.Gossip(p,1,totalRounds,numberOfMessages);
-            
+            totalRounds += 3; //this is for gossip
+            Thread thread = new Thread(() => c.Gossip(p, 1, totalRounds, numberOfMessages));
+            thread.Start();
+
         }
 
         public void JoinMeeting(String topic, String userName, List<String> slots)
@@ -621,6 +621,36 @@ namespace Project
                 String chosenClientName = listClientNames[randomIndex];
                 return (chosenClientName, this.ClientsURLS[chosenClientName]);
             }
+        }
+
+        public Dictionary<String, String> GetListOfRandomClients(int numberOfClients, String userName)
+        {
+            Dictionary<String, String> clients =  new Dictionary<String, String>();
+            if(numberOfClients < this.Clients.Count - 1)
+            {
+                for(int i = 0; i < numberOfClients; i++)
+                {
+                    (String clientName,String clientURL) = this.getRandomClientName();
+                    String test;
+                    clients.TryGetValue(clientName, out test);
+                    while (clientName == userName || test != null)
+                    {
+                        (clientName, clientURL) = this.getRandomClientName();
+                        clients.TryGetValue(clientName, out test);
+                    }
+                    clients[clientName] = clientURL;
+                }
+            }
+            else
+            {
+                //clients = this.ClientsURLS;
+                foreach(KeyValuePair<String,String> entry in this.ClientsURLS)
+                {
+                    if(entry.Key != userName)
+                        clients[entry.Key] = entry.Value;
+                }
+            }
+            return clients;
         }
 
         public void InitializeLocationsAndRooms()
@@ -1057,41 +1087,50 @@ namespace Project
             }
 
             Console.WriteLine("Clients:");
-            //FIXME add lock
-            if (Clients.Keys.Count != 0)
+            lock (this.Clients)
             {
-                foreach (string client in Clients.Keys)
+                if (Clients.Keys.Count != 0)
                 {
-                    Console.WriteLine("\t" + client);
+                    foreach (string client in Clients.Keys)
+                    {
+                        Console.WriteLine("\t" + client);
+                    }
                 }
-            } else { Console.WriteLine("\t No Clients Available"); }
+                else { Console.WriteLine("\t No Clients Available"); }
+            }
 
             Console.WriteLine("Proposals: ");
 
-            //FIXME add lock
-            if (Proposals.Keys.Count != 0)
+            lock (this.Proposals)
             {
-                foreach (string s in Proposals.Keys)
+                if (Proposals.Keys.Count != 0)
                 {
-                    Console.WriteLine("\t" + s);
-                    Console.WriteLine("\t\t\t " + Proposals[s].PrintInfo());
-                }
-            } else { Console.WriteLine("\t No Proposals Available"); }
-          
-            //FIXME add lock
-            Console.WriteLine("Locations and Meetings: ");
-            if (Meetings.Keys.Count != 0)
-            {
-                foreach (string location in Meetings.Keys)
-                {
-                    Console.WriteLine("\t" + location);
-                    foreach (Room room in Meetings[location].Location.Rooms)
+                    foreach (string s in Proposals.Keys)
                     {
-                        Console.WriteLine("\t\t" + room.ToString());
+                        Console.WriteLine("\t" + s);
+                        Console.WriteLine("\t\t\t " + Proposals[s].PrintInfo());
                     }
-                    Console.WriteLine("\t\t" + Meetings[location].ToString());
                 }
-            } else { Console.WriteLine("\t No Locations Available"); }
+                else { Console.WriteLine("\t No Proposals Available"); }
+            }
+
+            lock (this.Meetings)
+            {
+                Console.WriteLine("Locations and Meetings: ");
+                if (Meetings.Keys.Count != 0)
+                {
+                    foreach (string location in Meetings.Keys)
+                    {
+                        Console.WriteLine("\t" + location);
+                        foreach (Room room in Meetings[location].Location.Rooms)
+                        {
+                            Console.WriteLine("\t\t" + room.ToString());
+                        }
+                        Console.WriteLine("\t\t" + Meetings[location].ToString());
+                    }
+                }
+                else { Console.WriteLine("\t No Locations Available"); }
+            }
 
         }
 

@@ -63,6 +63,8 @@ namespace Project
 
         void Ping();
 
+        Dictionary<String, String> GetListOfRandomClients(int numberOfClients, String userName);
+
     }
 
     [Serializable]
