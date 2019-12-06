@@ -379,7 +379,18 @@ namespace Project
                                 }
 
                                 Meeting meeting = new Meeting(p.Coordinator, p.Topic, p.Min_attendees, p.N_invitees, chosenSlot, p.Invitees, p.Version + 1, selectedRoom, attendees);
-                                server.Meetings[chosenSlot.Location.Local].Meetings.Remove(meeting);
+                                foreach (LocationMeetings lm in server.Meetings.Values)
+                                {
+                                    for (int i = 0; i < lm.Meetings.Count; i++)
+                                    {
+                                        if (lm.Meetings[i].Topic == this.Topic)
+                                        {
+                                            lm.Meetings.RemoveAt(i);
+                                            goto label2;
+                                        }
+                                    }
+                                }
+                                label2:
                                 server.Meetings[chosenSlot.Location.Local].addMeeting(meeting);
                                 server.Proposals.Remove(p.Topic);
 
@@ -452,7 +463,7 @@ namespace Project
         {
             this.waitBetweenRequests();
 
-            lock (this) //FIXME freeze entre servidores
+            lock (this) 
             {
                 while (freeze)
                 {
@@ -515,7 +526,7 @@ namespace Project
 
         public void JoinMeeting(String topic, String userName, List<String> slots)
         {
-            //this.waitBetweenRequests();
+            this.waitBetweenRequests();
 
             lock (this)
             {
@@ -722,7 +733,7 @@ namespace Project
 
         private void DoPropagate(string url, string senderURL, Command command, string topic, Dictionary<string, int> vectorClock)
         {
-            lock (this) //FIXME freeze entre servidores
+            lock (this)
             {
                 while (freeze)
                 {
@@ -774,10 +785,6 @@ namespace Project
             {
                 Thread[] pool = new Thread[this.Available_Servers.Count - 1];
                 int i = 0;
-                if (senderURL == this.myURL) //FIXME hardcoded delay
-                {
-                    this.waitBetweenRequests();
-                }
                 for(i = 1; i < this.Available_Servers.Count; i++)
                 {
                     if (this.myURL != this.Available_Servers[i] && this.Available_Servers[i] != "failed")
@@ -792,7 +799,7 @@ namespace Project
 
         private void DoUpdate(string url, string senderURL, Command command, Dictionary<string, int> vectorClock)
         {
-            lock (this) //FIXME freeze entre servidores
+            lock (this)
             {
                 while (freeze)
                 {
@@ -1268,7 +1275,7 @@ namespace Project
 
         public void Ping()
         {
-            lock (this) //FIXME freeze entre servidores
+            lock (this)
             {
                 while (freeze)
                 {
@@ -1305,7 +1312,7 @@ namespace Project
 
         public int GetTicket(string topic, string serverURL, Dictionary<string, int> vectorClock)
         {
-            lock (this) //FIXME freeze entre servidores
+            lock (this)
             {
                 while (freeze)
                 {
@@ -1389,7 +1396,7 @@ namespace Project
 
         private void DoPropagateTicket(string url, string originalSender, int ticket, string topic, AbstractMeeting am, Dictionary<string, int> vectorClock)
         {
-            lock (this) //FIXME freeze entre servidores
+            lock (this)
             {
                 while (freeze)
                 {
@@ -1526,8 +1533,19 @@ namespace Project
                             else
                             {
                                 Meeting m = (Meeting)am;
-                                this.Meetings[m.Slot.Location.Local].Meetings.Remove(m);
-                                this.Meetings[m.Slot.Location.Local].addMeeting(m); //FIXME must replace, not add
+                                foreach (LocationMeetings lm in this.Meetings.Values)
+                                {
+                                    for (int i = 0; i < lm.Meetings.Count; i++)
+                                    {
+                                        if (lm.Meetings[i].Topic == am.Topic)
+                                        {
+                                            lm.Meetings.RemoveAt(i);
+                                            goto label3;
+                                        }
+                                    }
+                                }
+                                label3:
+                                this.Meetings[m.Slot.Location.Local].addMeeting(m);
                                 AbstractMeeting p = null;
                                 if (this.Proposals.ContainsKey(am.Topic))
                                 {
@@ -1791,10 +1809,6 @@ namespace Project
             {
                 Thread[] pool = new Thread[this.Available_Servers.Count - 1];
                 int i = 0;
-                if (sender == this.myURL) //FIXME hardcoded delay
-                {
-                    this.waitBetweenRequests();
-                }
                 //printServers();
                 foreach (string serverURL in this.Available_Servers)
                 {

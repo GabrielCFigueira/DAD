@@ -52,7 +52,6 @@ namespace PuppetMaster
             PastCommand.Text += pmi.readCommand(command) + "\r\n";
         }
 
-        //AddRoom FIXME por no readCommand
         private void button2_Click(object sender, EventArgs e)
         {
             string command = CommandBox.Text;
@@ -377,7 +376,7 @@ namespace PuppetMaster
         }
         
         public void Status()
-        { //FIXME locks?
+        {
             foreach (string serverID in serverDict.Keys)
             {
                 IServerPuppet server = (IServerPuppet)Activator.GetObject(typeof(IServerPuppet), serverDict[serverID].AbsoluteUri);
