@@ -749,31 +749,26 @@ namespace Project
             }
             catch (SocketException)
             {
-                try
+                
+                Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo1");
+                lock (this.Available_Servers) //is this the fix??
                 {
-                    si.Ping();
+                    this.WriteFailed(url);
+                    //this.Available_Servers.Remove(url);
                 }
-                catch (SocketException)
+                lock (tickets)
                 {
-                    Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo1");
-                    lock (this.Available_Servers) //is this the fix??
-                    {
-                        this.WriteFailed(url);
-                        //this.Available_Servers.Remove(url);
-                    }
-                    lock (tickets)
-                    {
-                        tickets.Remove(url);
-                        Monitor.PulseAll(tickets);
-                    }
+                    tickets.Remove(url);
+                    Monitor.PulseAll(tickets);
+                }
 
-                    if (masterServer == url)
-                    {
-                        //Start Leader_Election
-                        Thread thread = new Thread(() => leader_election("LE", this.lastTicket, this.myURL, this.myURL, url));
-                        thread.Start();
-                    }
+                if (masterServer == url)
+                {
+                    //Start Leader_Election
+                    Thread thread = new Thread(() => leader_election("LE", this.lastTicket, this.myURL, this.myURL, url));
+                    thread.Start();
                 }
+                
             }
         }
 
@@ -785,6 +780,10 @@ namespace Project
             {
                 Thread[] pool = new Thread[this.Available_Servers.Count - 1];
                 int i = 0;
+                if (senderURL == this.myURL) //FIXME hardcoded delay
+                {
+                    this.waitBetweenRequests();
+                }
                 for(i = 1; i < this.Available_Servers.Count; i++)
                 {
                     if (this.myURL != this.Available_Servers[i] && this.Available_Servers[i] != "failed")
@@ -815,40 +814,35 @@ namespace Project
             }
             catch (SocketException)
             {
-                try
+                
+                Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo2");
+                lock (this.Available_Servers)
                 {
-                    si.Ping();
+                    this.WriteFailed(url);
+                    //this.Available_Servers.Remove(url);
                 }
-                catch (SocketException)
+
+                lock (tickets)
                 {
-                    Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo2");
-                    lock (this.Available_Servers)
-                    {
-                        this.WriteFailed(url);
-                        //this.Available_Servers.Remove(url);
-                    }
-
-                    lock (tickets)
-                    {
-                        tickets.Remove(url);
-                        Monitor.PulseAll(tickets);
-                    }
-
-                    if (masterServer == url)
-                    {
-                        //Start Leader_Election
-
-
-                        lock (tickets) //Add my own ticket
-                        {
-                            tickets[this.myURL] = this.lastTicket;
-                        }
-
-                        Console.WriteLine("LEADER ELECTION!!!");
-                        Thread thread = new Thread(() => leader_election("LE", this.lastTicket, this.myURL, this.myURL, url));
-                        thread.Start();
-                    }
+                    tickets.Remove(url);
+                    Monitor.PulseAll(tickets);
                 }
+
+                if (masterServer == url)
+                {
+                    //Start Leader_Election
+
+
+                    lock (tickets) //Add my own ticket
+                    {
+                        tickets[this.myURL] = this.lastTicket;
+                    }
+
+                    Console.WriteLine("LEADER ELECTION!!!");
+                    Thread thread = new Thread(() => leader_election("LE", this.lastTicket, this.myURL, this.myURL, url));
+                    thread.Start();
+                }
+                
             }
         }
 
@@ -885,37 +879,31 @@ namespace Project
             }
             catch (SocketException)
             {
-                try
+                
+                Console.WriteLine("O servidor " + serverUrl + " crashou.Vou remove-lo3");
+                lock (this.Available_Servers) //is this the fix??
                 {
-                    si.Ping();
+                    this.WriteFailed(serverUrl);
                 }
-                catch (SocketException)
+
+                lock (tickets)
                 {
-
-                    Console.WriteLine("O servidor " + serverUrl + " crashou.Vou remove-lo3");
-                    lock (this.Available_Servers) //is this the fix??
-                    {
-                        this.WriteFailed(serverUrl);
-                    }
-
-                    lock (tickets)
-                    {
-                        tickets.Remove(serverUrl);
-                        Monitor.PulseAll(tickets);
-                    }
-
-                    lock (tickets)
-                    {
-                        tickets[this.myURL] = this.lastTicket;
-                    }
-
-                    if (masterServer == serverUrl)
-                    {
-                        //Start Leader_Election
-                        Thread thread = new Thread(() => leader_election("LE", this.lastTicket, this.myURL, this.myURL, serverUrl));
-                        thread.Start();
-                    }
+                    tickets.Remove(serverUrl);
+                    Monitor.PulseAll(tickets);
                 }
+
+                lock (tickets)
+                {
+                    tickets[this.myURL] = this.lastTicket;
+                }
+
+                if (masterServer == serverUrl)
+                {
+                    //Start Leader_Election
+                    Thread thread = new Thread(() => leader_election("LE", this.lastTicket, this.myURL, this.myURL, serverUrl));
+                    thread.Start();
+                }
+                
             }
         }
 
@@ -1412,32 +1400,27 @@ namespace Project
             }
             catch (SocketException)
             {
-                try
+                
+                Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo5");
+                lock (this.Available_Servers) //is this the fix??
                 {
-                    si.Ping();
+                    this.WriteFailed(url);
+                    //this.Available_Servers.Remove(url);
                 }
-                catch (SocketException)
+
+                lock (tickets)
                 {
-                    Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo5");
-                    lock (this.Available_Servers) //is this the fix??
-                    {
-                        this.WriteFailed(url);
-                        //this.Available_Servers.Remove(url);
-                    }
-
-                    lock (tickets)
-                    {
-                        tickets.Remove(url);
-                        Monitor.PulseAll(tickets);
-                    }
-
-                    if (masterServer == url)
-                    {
-                        //Start Leader_Election
-                        Thread thread = new Thread(() => leader_election("LE", this.lastTicket, this.myURL, this.myURL, url));
-                        thread.Start();
-                    }
+                    tickets.Remove(url);
+                    Monitor.PulseAll(tickets);
                 }
+
+                if (masterServer == url)
+                {
+                    //Start Leader_Election
+                    Thread thread = new Thread(() => leader_election("LE", this.lastTicket, this.myURL, this.myURL, url));
+                    thread.Start();
+                }
+                
             }
         }
 
@@ -1699,34 +1682,29 @@ namespace Project
                         } catch (SocketException)
                         {
                             this.MyVectorClock[this.myURL]--;
-                            try
+                            
+                            Console.WriteLine("O servidor master " + masterServer + " crashou.Vou remove-lo6");
+                            lock (this.Available_Servers)
                             {
-                                si.Ping();
+                                WriteFailed(masterServer);
                             }
-                            catch (SocketException)
+
+                            lock (tickets)
                             {
-                                Console.WriteLine("O servidor master " + masterServer + " crashou.Vou remove-lo6");
-                                lock (this.Available_Servers)
-                                {
-                                    WriteFailed(masterServer);
-                                }
+                                tickets.Remove(masterServer);
+                                Monitor.PulseAll(tickets);
+                            }
 
-                                lock (tickets)
-                                {
-                                    tickets.Remove(masterServer);
-                                    Monitor.PulseAll(tickets);
-                                }
+                            lock (tickets)
+                            {
+                                tickets[this.myURL] = this.lastTicket;
+                            }
 
-                                lock (tickets)
-                                {
-                                    tickets[this.myURL] = this.lastTicket;
-                                }
-
-                                Thread thread = new Thread(() => leader_election("LE", lastTicket, this.myURL, this.myURL, masterServer));
-                                thread.Start();
-                                Monitor.PulseAll(this.MyVectorClock);
+                            Thread thread = new Thread(() => leader_election("LE", lastTicket, this.myURL, this.myURL, masterServer));
+                            thread.Start();
+                            Monitor.PulseAll(this.MyVectorClock);
                                 
-                            }
+                            
                             return;
                         }
                     }
@@ -1833,27 +1811,21 @@ namespace Project
             }
             catch (SocketException e)
             {
-                try
+              
+                //Se crashar remover dos available servers e dos tickets
+                Console.WriteLine("O server " + receiver + " crashou! Vou Remover");
+                //Console.WriteLine(e);
+                lock (this.Available_Servers) //is this the fix??
                 {
-                    si.Ping();
+                    this.Available_Servers.Remove(receiver);
                 }
-                catch (SocketException)
+
+                lock (tickets)
                 {
-
-                    //Se crashar remover dos available servers e dos tickets
-                    Console.WriteLine("O server " + receiver + " crashou! Vou Remover");
-                    //Console.WriteLine(e);
-                    lock (this.Available_Servers) //is this the fix??
-                    {
-                        this.Available_Servers.Remove(receiver);
-                    }
-
-                    lock (tickets)
-                    {
-                        this.tickets.Remove(receiver);
-                        Monitor.PulseAll(tickets);
-                    }
+                    this.tickets.Remove(receiver);
+                    Monitor.PulseAll(tickets);
                 }
+                
 
             }
         }
