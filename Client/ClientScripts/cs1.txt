@@ -1,14 +1,30 @@
-create myTopic0 2 2 2 Lisboa,2020-01-02 Porto,2020-02-03 c1 c2
-create myTopic1 2 2 2 Lisboa,2020-01-02 Porto,2020-02-03 c1 c2
+create myTopic0 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic1 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
 create myTopic2 1 1 0 Porto,2020-01-10
-list
-join myTopic2 1 Porto,2020-01-10
-close myTopic2
-list
-close myTopic0
-list
-join myTopic1 1 Lisboa,2020-01-02
-list
-close myTopic1
-join myTopic0 1 Lisboa,2020-01-02
-list
+create myTopic3 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic4 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic5 1 1 0 Porto,2020-01-10
+create myTopic6 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic7 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic8 1 1 0 Porto,2020-01-10
+create myTopic9 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic10 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic11 1 1 0 Porto,2020-01-10
+create myTopic12 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic13 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic14 1 1 0 Porto,2020-01-10
+create myTopic15 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic16 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic17 1 1 0 Porto,2020-01-10
+create myTopic18 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic19 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic20 1 1 0 Porto,2020-01-10
+create myTopic21 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic22 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic23 1 1 0 Porto,2020-01-10
+create myTopic24 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic25 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic26 1 1 0 Porto,2020-01-10
+create myTopic27 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic28 2 2 0 Lisboa,2020-01-02 Porto,2020-02-03
+create myTopic29 1 1 0 Porto,2020-01-10
