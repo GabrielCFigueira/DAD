@@ -1363,8 +1363,6 @@ namespace Project
                     this.Available_Servers.Remove(url);
                 }
             }
-            Monitor.PulseAll(this.MyVectorClock);
-            Monitor.PulseAll(this.Tickets);
             return ticket;
 
         }
