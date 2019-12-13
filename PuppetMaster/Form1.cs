@@ -30,7 +30,7 @@ namespace PuppetMaster
             InitializeComponent();
             TcpChannel channel = new TcpChannel(10001);
             ChannelServices.RegisterChannel(channel, false);
-            pmi = new PuppetMasterImp("..\\..\\PCShostnames.txt", "..\\..\\Commands.txt");
+            pmi = new PuppetMasterImp("..\\..\\PCShostnames.txt", "..\\..\\pms2-sa-nofaults");
             RemotingServices.Marshal(pmi, "PuppetMaster", typeof(PuppetMasterImp));
 
         }

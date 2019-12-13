@@ -31,7 +31,7 @@ namespace Project
 
             IDictionary props = new Hashtable();
             props["port"] = uri.Port;
-            props["timeout"] = 6000; // in milliseconds
+            props["connectionsTimeout"] = 60000; // in milliseconds
             TcpChannel channel = new TcpChannel(props, null, provider);
 
             try
@@ -434,7 +434,7 @@ namespace Project
             this.masterServer = masterServer; //Leader_ID
 
             this.thread = new Thread(() => checkPendings());
-            this.thread.Start();
+            //this.thread.Start();
 
             //Reliable_Broadcast
             this.acks = new Dictionary<string, List<string>>();
@@ -812,9 +812,10 @@ namespace Project
                 si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), url);
                 si.UpdateMeeting(command, senderURL, this.myURL, vectorClock);
             }
-            catch (SocketException)
+            catch (SocketException e)
             {
-                
+
+                Console.WriteLine(e.Message);
                 Console.WriteLine("O servidor " + url + " crashou.Vou remove-lo2");
                 lock (this.Available_Servers)
                 {
@@ -1021,9 +1022,9 @@ namespace Project
                 }
                 this.MyVectorClock[originalSender] = Math.Max(vectorClock[originalSender],this.MyVectorClock[originalSender]);
 
-                command.Execute(this);
                 Monitor.PulseAll(this.MyVectorClock);
             }
+            command.Execute(this);
         }
         public void UpdateClose(Command command, string topic, string originalSender, string serverURL, Dictionary<string, int> vectorClock)
         {
@@ -1655,25 +1656,21 @@ namespace Project
 
             ServerInterface si = null;
             clock2[this.myURL]++;
-            lock (this.MyVectorClock)
+
+            if (masterServer == this.myURL) //Se o master estiver crashado nao faz isto
             {
-                lock (this.PendingCommands)
+                newTicket = GetTicket(topic, this.myURL, clock2);
+                if (newTicket == 0)
                 {
-                    if (masterServer == this.myURL) //Se o master estiver crashado nao faz isto
-                    {
-                        newTicket = GetTicket(topic, this.myURL, clock2);
-                        if (newTicket == 0)
-                        {
-                            Monitor.PulseAll(this.MyVectorClock);
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), masterServer);
-                    }
+                    Monitor.PulseAll(this.MyVectorClock);
+                    return;
                 }
             }
+            else
+            {
+                si = (ServerInterface)Activator.GetObject(typeof(ServerInterface), masterServer);
+            }
+
 
             if (si != null)
             {
@@ -1703,7 +1700,7 @@ namespace Project
 
                     Thread thread = new Thread(() => leader_election("LE", lastTicket, this.myURL, this.myURL, masterServer));
                     thread.Start();
-                    Monitor.PulseAll(this.MyVectorClock);
+                    
                     return;
                 }
             }

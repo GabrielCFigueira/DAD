@@ -1,0 +1,42 @@
+AddRoom Lisboa 14 RL
+AddRoom Porto 5 RP
+AddRoom Funchal 20 RF
+AddRoom Coimbra 100 RC
+Server s1 tcp://localhost:3001/s1 2 0 0
+Wait 1000
+Server s2 tcp://localhost:3002/s2 2 0 0
+Wait 1000
+Server s3 tcp://localhost:3003/s3 2 0 0
+Wait 1000
+Server s4 tcp://localhost:3004/s4 2 0 0
+Wait 1000
+Server s5 tcp://localhost:3005/s5 2 0 0
+Wait 1000
+Server s6 tcp://localhost:3006/s6 2 0 0
+Wait 1000
+Server s7 tcp://localhost:3007/s7 2 0 0
+Wait 3000
+Client c1 tcp://localhost:4001/client1 tcp://localhost:3001/s1 cs1
+Client c2 tcp://localhost:4002/client2 tcp://localhost:3001/s1 cs2
+Client c3 tcp://localhost:4003/client3 tcp://localhost:3002/s2 cs3
+Client c4 tcp://localhost:4004/client4 tcp://localhost:3002/s2 cs4
+Client c5 tcp://localhost:4005/client5 tcp://localhost:3003/s3 cs5
+Client c6 tcp://localhost:4006/client6 tcp://localhost:3003/s3 cs6
+Client c7 tcp://localhost:4007/client7 tcp://localhost:3004/s4 cs7
+Client c8 tcp://localhost:4008/client8 tcp://localhost:3004/s4 cs8
+Client c9 tcp://localhost:4009/client9 tcp://localhost:3005/s5 cs9
+Client c10 tcp://localhost:4010/client10 tcp://localhost:3005/s5 cs10
+Client c11 tcp://localhost:4011/client11 tcp://localhost:3006/s6 cs11
+Client c12 tcp://localhost:4012/client12 tcp://localhost:3006/s6 cs12
+Client c13 tcp://localhost:4013/client13 tcp://localhost:3007/s7 cs13
+Client c14 tcp://localhost:4014/client14 tcp://localhost:3007/s7 cs14
+Status
+Wait 2000
+Wait 3000
+Wait 2000
+Wait 5000
+Status
+Wait 5000
+Status
+Wait 5000
+Status

@@ -1,0 +1,13 @@
+Server s1 tcp://193.136.154.38:3001/server1 0 0 0
+Wait 1000
+Server s2 tcp://193.136.154.38:3002/server2 0 0 0
+Wait 1000
+Server s3 tcp://193.136.154.38:3003/server3 0 0 0
+Wait 1000
+AddRoom Lisboa 2 room1
+AddRoom Porto 1 room2
+Wait 2000
+Client c1 tcp://193.136.154.37:4001/client1 tcp://193.136.154.38:3001/server1 cs1
+Client c2 tcp://193.136.154.37:4002/client2 tcp://193.136.154.38:3002/server2 cs2
+Wait 15000
+Status
